@@ -10,8 +10,8 @@ xset s off -dpms 2>/dev/null || true
 echo performance | sudo -n tee /sys/devices/system/cpu/cpufreq/policy*/scaling_governor >/dev/null 2>&1 || true
 # 找 Python：优先 conda 环境 lab_safety（setup.sh 默认），其次 .venv，最后系统 python3
 PY=python3
-for d in "$HOME/miniforge3" "$HOME/miniconda3" "$HOME/anaconda3" "$HOME/.conda"; do
-  if [ -x "$d/envs/lab_safety/bin/python" ]; then PY="$d/envs/lab_safety/bin/python"; break; fi
+for d in "$LABGUARD_CONDA_DIR" /userdata/miniforge3 "$HOME/miniforge3" "$HOME/miniconda3" "$HOME/anaconda3" "$HOME/.conda"; do
+  if [ -n "$d" ] && [ -x "$d/envs/lab_safety/bin/python" ]; then PY="$d/envs/lab_safety/bin/python"; break; fi
 done
 if [ "$PY" = python3 ] && [ -x .venv/bin/python ]; then PY=.venv/bin/python; fi
 # 正式部署：小屏 + 网页大屏。没接屏幕时自动改为 headless（只跑安全核心和网页）
