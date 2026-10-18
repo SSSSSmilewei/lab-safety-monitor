@@ -4,6 +4,8 @@
 # 用法：bash deploy/orangepi/setup.sh
 #   默认用 conda（Miniforge）建 Python 环境，和电脑上的 environment.yml 是同一份；
 #   想用系统 Python + venv 的老办法：LABGUARD_USE_VENV=1 bash deploy/orangepi/setup.sh
+#   系统盘小的板子（如视美泰 AIOT-3588A）把 conda 装到大分区：
+#     LABGUARD_CONDA_DIR=/userdata/miniforge3 bash deploy/orangepi/setup.sh
 set -e
 APP_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$APP_DIR"
@@ -31,7 +33,7 @@ if [ -n "$LABGUARD_USE_VENV" ]; then
   pip install -r /tmp/labguard_req.txt
 else
   echo "==> 3/6 用 conda 创建 Python 环境 lab_safety（第一次要下载约 1–2 GB，耐心等）"
-  CONDA_DIR="$HOME/miniforge3"
+  CONDA_DIR="${LABGUARD_CONDA_DIR:-$HOME/miniforge3}"
   if ! command -v conda >/dev/null 2>&1 && [ ! -x "$CONDA_DIR/bin/conda" ]; then
     INSTALLER=/tmp/Miniforge3-Linux-aarch64.sh
     wget -q -O "$INSTALLER" https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh \
@@ -49,11 +51,20 @@ else
 fi
 echo "==> 4/6 NPU 推理运行库（RKNN）"
 pip install rknn-toolkit-lite2 || echo "!! rknn-toolkit-lite2 安装失败：请从 github.com/airockchip/rknn-toolkit2 的 rknn-toolkit-lite2/packages 下载对应 Python 版本的 whl 手动安装"
+# pip 装的 rknn-toolkit-lite2 是 2.x，需要 2.x 的 librknnrt；厂家镜像自带 1.x 的要换掉（旧文件备份为 .bak）
+if [ -f /usr/lib/librknnrt.so ] && strings /usr/lib/librknnrt.so | grep -q "librknnrt version: 1\."; then
+  echo "   /usr/lib/librknnrt.so 是 1.x 版本，备份后更新为 2.x"
+  sudo mv /usr/lib/librknnrt.so /usr/lib/librknnrt.so.bak
+fi
 if [ ! -f /usr/lib/librknnrt.so ]; then
   echo "   未找到 /usr/lib/librknnrt.so，尝试下载..."
-  sudo wget -q -O /usr/lib/librknnrt.so \
-    https://github.com/airockchip/rknn-toolkit2/raw/master/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so \
-    || echo "!! 下载失败：请从 rknn-toolkit2 仓库 rknpu2/runtime/Linux/librknn_api/aarch64/ 手动拷贝 librknnrt.so 到 /usr/lib/"
+  if wget -q -O /tmp/librknnrt.so \
+    https://github.com/airockchip/rknn-toolkit2/raw/master/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so; then
+    sudo mv /tmp/librknnrt.so /usr/lib/librknnrt.so
+  else
+    echo "!! 下载失败：请从 rknn-toolkit2 仓库 rknpu2/runtime/Linux/librknn_api/aarch64/ 手动拷贝 librknnrt.so 到 /usr/lib/"
+    [ -f /usr/lib/librknnrt.so.bak ] && sudo mv /usr/lib/librknnrt.so.bak /usr/lib/librknnrt.so
+  fi
 fi
 if ls models/*_rknn_model >/dev/null 2>&1; then
   echo "   已找到 RKNN 模型：$(ls -d models/*_rknn_model | tr '\n' ' ')"
