@@ -511,7 +511,7 @@ def start_server(engine) -> Optional[threading.Thread]:
     try:
         path = resolve_path(os.path.join("runtime", "web_url.txt"))
         with open(path, "w", encoding="utf-8") as f:
-            f.write("\n".join(urls) + "\n")
+            f.write("\n".join(f"{u}/?token={tok}" for u in urls) + "\n")   # 带口令，复制整行就能直接登录
     except OSError:
         pass
     return t

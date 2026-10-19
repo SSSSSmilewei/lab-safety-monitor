@@ -125,7 +125,7 @@ ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/
 
 ## 8. 网页大屏接口（`src/web/server.py`，默认端口 8080）
 
-- 端口被占用（如 Dify / Docker）时自动顺延到 8081、8082……；实际网址打印在启动窗口里，并写入 `runtime/web_url.txt`。`web_port()` 返回实际端口。
+- 端口被占用（如 Dify / Docker）时自动顺延到 8081、8082……；实际网址（带口令）打印在启动窗口里，并写入 `runtime/web_url.txt`。`web_port()` 返回实际端口。
 
 - 除 `/`、`/static/*`、`/font/*`、`/api/ping` 外都要口令：请求头 `X-Token` 或 `?token=`。口令为 `web.token`，留空则自动生成并写入 `runtime/web_token.txt`。
 - 只读：`GET /api/snapshot`、`WS /ws`（2 Hz 推送 snapshot + 最近事件）、`GET /api/events`、`GET /api/events/{uid}/snapshot.jpg`、`GET /stream/{pano|desk}.mjpg`、`GET /api/frame/{pano|desk}.jpg`、`GET /api/config`、`/api/models`、`/api/media`、`/api/agent`、`/api/env`、`/api/demo`。
