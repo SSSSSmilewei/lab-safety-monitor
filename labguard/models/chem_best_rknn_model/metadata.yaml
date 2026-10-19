@@ -1,0 +1,38 @@
+description: Ultralytics YOLO11n model trained on /home/smilewei/文件/Smilewei_Ujmcmc/Coding_Life/AIVision/chem/chemical-lab02/data.yaml
+author: Ultralytics
+date: '2026-10-18T17:49:11.230381+00:00'
+version: 8.4.182
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+head: Detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: Beaker
+  1: Burette
+  2: Conical Flask
+  3: Flat Bottom Flask
+  4: Funnel
+  5: Measuring Cylinder
+  6: Pear shaped flask
+  7: Pipette
+  8: Reagent Bottle
+  9: Round Bottom Flask
+  10: Test tube
+  11: Titrarion
+  12: Volumetric flask
+  13: Wash Bottle
+args:
+  data: null
+  batch: 1
+  name: rk3588
+  fraction: 1.0
+  quantize: 16
+  simplify: true
+  opset: null
+channels: 3
+end2end: false

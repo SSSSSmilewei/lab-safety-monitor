@@ -491,6 +491,11 @@ def start_server(engine) -> Optional[threading.Thread]:
         print(f"[Web] 端口 {want} 已被其他程序占用（例如 Dify / Docker），自动改用 {port}")
     _web_port = port
     app = create_app(engine)
+    # rknn-toolkit-lite2 导入时会把 logging 的级别名换成 C/E/W/I/D，uvicorn 配置日志时会报 Unknown level，这里补回标准名字
+    import logging
+    for _name, _lvl in (("CRITICAL", 50), ("FATAL", 50), ("ERROR", 40), ("WARN", 30), ("WARNING", 30),
+                        ("INFO", 20), ("DEBUG", 10), ("NOTSET", 0)):
+        logging._nameToLevel.setdefault(_name, _lvl)
     config = uvicorn.Config(app, host=host, port=port, log_level="warning", access_log=False)
     server = uvicorn.Server(config)
     server.install_signal_handlers = lambda: None   # 在子线程运行，信号交给 Qt 主线程
@@ -506,7 +511,7 @@ def start_server(engine) -> Optional[threading.Thread]:
     try:
         path = resolve_path(os.path.join("runtime", "web_url.txt"))
         with open(path, "w", encoding="utf-8") as f:
-            f.write("\n".join(urls) + "\n")
+            f.write("\n".join(f"{u}/?token={tok}" for u in urls) + "\n")   # 带口令，复制整行就能直接登录
     except OSError:
         pass
     return t
