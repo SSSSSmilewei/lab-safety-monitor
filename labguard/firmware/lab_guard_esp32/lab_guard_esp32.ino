@@ -21,6 +21,9 @@
  *   - 用板子上标 "UART/COM" 的口连接香橙派：USB CDC On Boot = Disabled
  *   - 用标 "USB" 的原生口连接：USB CDC On Boot = Enabled
  *   两种接法下 Serial 都对应连接香橙派的那个口。
+ * 本队板子 ESP32-S3-N8R8，编译参数（arduino-cli + esp32 核心 3.3.12）：
+ *   FQBN esp32:esp32:esp32s3:FlashSize=8M,PartitionScheme=default_8MB,PSRAM=opi,CDCOnBoot=default
+ *   （N16R8 把 FlashSize 改成 16M、分区选 default_16MB 即可）
  *
  * 帧格式与 LabSafetyMonitor/serial_comm.py 完全一致：
  *   AA 55 | LEN | SEQ | CMD | PAYLOAD | CRC16(LE)   CRC16-CCITT 覆盖 LEN..PAYLOAD
@@ -129,11 +132,22 @@ void setBuzzer(bool on) {
   digitalWrite(PIN_BUZZER, (on == BUZZER_ACTIVE_HIGH) ? HIGH : LOW);
 }
 
+// 非阻塞蜂鸣：只登记响几声，由 updateIndicators() 按时间开关。
+// 不能用 delay()：断电提示音约 0.6 s，会让 ACK 晚于上位机的 0.25 s 超时，被误记为"下位机无应答"。
+uint8_t  beepPhases = 0;      // 剩余的响 / 停段数
+uint16_t beepMs = 0;
+uint32_t beepPhaseAt = 0;
+
 void beep(int times, int ms) {
-  for (int i = 0; i < times; i++) {
-    setBuzzer(true);  delay(ms);
-    setBuzzer(false); if (i + 1 < times) delay(ms);
-  }
+  beepPhases = times * 2 - 1;  // 响、停、响……以响结尾
+  beepMs = ms;
+  beepPhaseAt = millis();
+}
+
+bool beepActive() {
+  uint32_t now = millis();
+  while (beepPhases && now - beepPhaseAt >= beepMs) { beepPhases--; beepPhaseAt += beepMs; }
+  return beepPhases % 2 == 1;  // 奇数段 = 响
 }
 
 void setRelay(bool on) {
@@ -311,11 +325,11 @@ void handleButton() {
 void updateIndicators() {
   uint32_t now = millis();
   bool r = false, y = false, g = false;
+  bool chirp = false;
   if (latched) {
     r = true;
-    setBuzzer((now % 2000) < 150);   // 锁定期间每 2 秒短鸣一次
+    chirp = (now % 2000) < 150;      // 锁定期间每 2 秒短鸣一次
   } else {
-    setBuzzer(false);
     if (now - lastHb > HB_LOST_MS) y = (now / 500) % 2;           // 上位机失联：黄灯闪烁
     else if (alertLevel == 2) r = true;
     else if (alertLevel == 1) y = true;
@@ -323,6 +337,7 @@ void updateIndicators() {
     if (alertLevel > prevAlertLevel) beep(alertLevel, 80);
   }
   prevAlertLevel = alertLevel;
+  setBuzzer(beepActive() || chirp);
   digitalWrite(PIN_LED_R, r);
   digitalWrite(PIN_LED_Y, y);
   digitalWrite(PIN_LED_G, g);
