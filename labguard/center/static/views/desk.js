@@ -47,7 +47,7 @@
     var th = k.thresholds || { mid: 30, high: 70 };
     var col = { high: 'var(--high)', mid: 'var(--mid)', low: '#2EBD85' }[lv];
     var bg = { high: 'var(--high-bg)', mid: 'var(--mid-bg)', low: 'var(--low-bg)' }[lv];
-    var voice = { high: '严厉干预', mid: '温和提醒', low: '静默' }[lv];
+    var voice = { high: '严厉干预', mid: '温和提醒', low: '温和提醒' }[lv];
     var lightName = { high: '红', mid: '黄', low: '绿' }[lv];
     var factors = (k.factors || []).slice().sort(function (a, b) { return b.points - a.points; });
     return '<div style="display:flex;align-items:stretch;border-bottom:2px solid var(--ink)">' +
@@ -58,12 +58,25 @@
       '<div style="padding:10px 14px;border-bottom:2px solid var(--ink)"><div class="scorebar"><i class="fill" style="width:' + Math.min(100, score) + '%;background:' + col + '"></i>' +
       '<i class="tick" style="left:' + th.mid + '%"></i><i class="tick" style="left:' + th.high + '%"></i></div>' +
       '<div class="scorelbl num mut"><span style="left:0">0 低危</span><span style="left:' + th.mid + '%">' + th.mid + ' 中危</span><span style="left:' + th.high + '%">' + th.high + ' 高危</span></div></div>' +
+      tiersHtml(k) +
       '<div class="row head">判定依据</div>' +
       (factors.length ? factors.map(function (f) {
         var cross = /×/.test(f.source);
         return '<div class="row"><span class="tag ' + (cross ? 't-ink' : 't-soft') + '">' + esc(f.source) + '</span><span class="grow" style="flex:1 1 160px">' + esc(f.text) +
           '</span><span class="num" style="font-weight:700">+' + f.points + '</span></div>';
       }).join('') : '<div class="row mut">无风险因素</div>');
+  }
+
+  // 分层上报：同一次判断在学生端、实验室老师、实验楼三层的等级与处置方式（终端 cross_check.tiers）
+  function tiersHtml(k) {
+    var t = k.tiers;
+    if (!t) return '';
+    return '<div class="row head">分层上报</div>' + ['student', 'teacher', 'building'].map(function (key) {
+      var x = t[key] || {}, L = LG.LV[x.level] || LG.LV.low;
+      var why = (x.reasons || []).join(' · ') || (key === 'teacher' && (x.notes || []).length ? '知会：' + x.notes.join('、') : '');
+      return '<div class="row"><span style="min-width:84px;font-weight:600">' + esc(x.name || key) + '</span><span class="' + L.tag + '">' + L.text + '</span>' +
+        '<span class="tag t-soft">' + esc(x.action || '') + '</span><span class="grow mut" style="flex:1 1 160px">' + esc(why) + '</span></div>';
+    }).join('');
   }
 
   function ppeHtml(s) {

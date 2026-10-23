@@ -164,6 +164,9 @@ class SafetyEngine(QObject):
                 "wm_phase": wm.get("phase"), "wm_risk": wm.get("risk"), "wm_eta_s": wm.get("eta_s"),
                 "latched": sm.latched,
                 "event_levels": [e.get("level") for e in active],
+                # 分层上报：老师 / 实验楼只看安全规则事件，饮食、防护这类行为事件留在学生端
+                "hazard_levels": [e.get("level") for e in active if e.get("kind") in sm.HAZARD_KINDS],
+                "called": time.time() - getattr(self, "_called_at", 0.0) < float(cfg("cross.call_hold_s", 120)),
             }, mid_score=float(cfg("cross.mid_score", cross_check.MID_SCORE)),
                 high_score=float(cfg("cross.high_score", cross_check.HIGH_SCORE)))
         except Exception as e:   # 交叉验证出错不影响断电规则；灯光仍由事件等级保底
@@ -258,6 +261,7 @@ class SafetyEngine(QObject):
 
     def call_admin(self, who: str = "实验员") -> None:
         self.last_call = {"ts": time.time(), "who": str(who)[:20]}
+        self._called_at = time.time()   # 交叉验证据此把实验室老师层至少提到中危（cross.call_hold_s 内）
         events.log("呼叫管理员", f"{who}在终端上发起求助", level="WARNING", kind="call_admin", snapshot=True)
 
     # ------------------------------------------------------------------

@@ -313,4 +313,32 @@ check(r.status_code == 200 and r.headers["x-frame-source"] == "demo", "终端在
 admin.delete(f"/api/desks/{ids['B1']}/demo/pano")
 check(admin.get(f"/api/desks/{ids['B1']}/frame/pano.jpg").status_code == 503, "清除演示画面")
 
+# ---------------------------------------------------------------------------
+print("[8] 分层上报：学生端 / 实验室 / 实验楼各自的等级")
+from center.app import tier_levels
+apple = {"state": "CRITICAL", "latched": False,
+         "risk": {"level": "high", "level_text": "高危", "score": 89, "scene": "台面操作中（未加热）",
+                  "tiers": {"student": {"name": "学生端", "level": "high", "action": "严厉干预"},
+                            "teacher": {"name": "实验室老师", "level": "low", "action": "仅记录", "reasons": [],
+                                        "notes": ["实验区饮食", "未佩戴口罩"]},
+                            "building": {"name": "实验楼", "level": "low", "action": "无需介入", "reasons": []}}},
+         "active_events": [{"title": "实验区饮食"}]}
+node.post("/api/node/report", headers={"X-Node-Token": node_token}, json={"snapshot": apple, "meta": {}})
+ov = zhang.get("/api/overview").json()
+d = [x for x in ov["desks"] if x["area_id"] == ids["A1"]][0]
+check(ov["tier"] == "teacher" and d["risk_level"] == "low" and ov["summary"]["high"] == 0,
+      "教师默认看实验室层：摘防护吃东西不进处置队列")
+check(d["levels"] == {"student": "high", "teacher": "low", "building": "low"} and "实验区饮食" in d["notes"],
+      "概况同时带三层等级，行为违规记为知会")
+check(admin.get("/api/overview").json()["tier"] == "building", "管理员默认看实验楼层")
+ov = zhang.get("/api/overview?tier=student").json()
+check(ov["tier"] == "student" and ov["summary"]["high"] == 1, "可切换到学生端视角，与实验台提醒一致")
+check(zhang.get("/api/overview?tier=xyz").json()["tier"] == "teacher", "非法视角按角色回落")
+old = {"latched": True, "risk": {"level": "high"}}
+t = tier_levels(old)
+check(t["student"]["level"] == "high" and t["teacher"]["level"] == "high" and t["building"]["level"] == "high",
+      "旧版终端无分层数据：断电锁定时三层均为高危")
+t = tier_levels({"risk": {"level": "mid"}})
+check(t["teacher"]["level"] == "mid" and t["building"]["level"] == "low", "旧版终端兜底：老师层沿用原等级，实验楼不打扰")
+
 print(f"\n全部通过：{len(PASSED)} 项")

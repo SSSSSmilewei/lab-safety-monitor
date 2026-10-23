@@ -126,7 +126,77 @@ def assess(d: Dict[str, Any], mid_score: float = MID_SCORE, high_score: float = 
     score = min(100, sum(f["points"] for f in factors))
     level = "high" if score >= high_score else "mid" if score >= mid_score else "low"
     factors.sort(key=lambda f: -f["points"])
-    return {"level": level, "level_text": LEVEL_TEXT[level], "light": LEVEL_LIGHT[level], "score": score,
-            "scene": scene, "factors": factors, "thresholds": {"mid": mid_score, "high": high_score},
-            "inputs": {"person_present": present, "ppe_missing": missing, "heatable": heatable,
-                       "non_heatable": non_heatable, "heating": heating, "phase": phase}}
+    result = {"level": level, "level_text": LEVEL_TEXT[level], "light": LEVEL_LIGHT[level], "score": score,
+              "scene": scene, "factors": factors, "thresholds": {"mid": mid_score, "high": high_score},
+              "inputs": {"person_present": present, "ppe_missing": missing, "heatable": heatable,
+                         "non_heatable": non_heatable, "heating": heating, "phase": phase}}
+    result["tiers"] = tiers(result, d, mid_score, high_score)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# 分层上报：同一次判断，对学生、实验室老师、实验楼是三套不同的等级
+# ---------------------------------------------------------------------------
+# 学生端：上面的 level，驱动语音台词、小屏「待处理事项」和信号灯，越早越细越好。
+# 实验室老师：只算"过程风险"（加热、温度、烟雾、断电）和学生主动求助；
+#            摘口罩、吃东西这类纯行为违规只在学生端纠正，老师这边记一笔"知会"，不进处置队列。
+# 实验楼：只关心需要楼里介入的事：已断电锁定、紧急安全事件；某间实验室出现高危时标"关注"。
+BEHAVIOR_SOURCES = {"人员模型", "人员 × 器皿", "器皿模型"}      # 不涉及加热 / 传感器的现场行为
+TIER_NAMES = {"student": "学生端", "teacher": "实验室老师", "building": "实验楼"}
+TIER_ACTION = {
+    "student": {"low": "温和提醒", "mid": "温和提醒", "high": "严厉干预"},
+    "teacher": {"low": "仅记录", "mid": "需关注", "high": "立即处置"},
+    "building": {"low": "无需介入", "mid": "关注", "high": "需介入"},
+}
+
+
+def _level(score: float, mid_score: float, high_score: float) -> str:
+    return "high" if score >= high_score else "mid" if score >= mid_score else "low"
+
+
+def tiers(r: Dict[str, Any], d: Dict[str, Any], mid_score: float = MID_SCORE,
+          high_score: float = HIGH_SCORE) -> Dict[str, Dict[str, Any]]:
+    """
+    由学生端结果推出另外两层。额外输入（缺省时退回 event_levels）：
+      hazard_levels: 当前活动的安全规则事件等级（干烧、烟雾、加热无人等，不含饮食、防护这类行为事件）
+      called:        学生最近在终端上按了「呼叫教师」
+    """
+    latched = bool(d.get("latched"))
+    hz = set(d.get("hazard_levels") if d.get("hazard_levels") is not None else (d.get("event_levels") or []))
+
+    # ---- 实验室老师 ----
+    reasons: List[Dict[str, Any]] = [
+        {"text": f["text"], "points": f["points"]} for f in r["factors"]
+        if f["source"] not in BEHAVIOR_SOURCES and f["source"] != "规则引擎"]
+    if latched:
+        reasons.append({"text": "已断电锁定，需到场排查", "points": 100})
+    elif "CRITICAL" in hz:
+        reasons.append({"text": "存在紧急安全事件", "points": 100})
+    elif "WARNING" in hz:
+        reasons.append({"text": "存在安全警告", "points": 40})
+    if d.get("called"):
+        reasons.append({"text": "学生在终端上呼叫教师", "points": 40})
+    reasons.sort(key=lambda x: -x["points"])
+    t_score = min(100, sum(x["points"] for x in reasons))
+    t_level = _level(t_score, mid_score, high_score)
+    notes = [f["text"] for f in r["factors"] if f["source"] in BEHAVIOR_SOURCES]
+
+    # ---- 实验楼 ----
+    if latched or "CRITICAL" in hz:
+        b_level = "high"
+        b_reasons = ["已断电锁定" if latched else "存在紧急安全事件"]
+    elif t_level == "high":
+        b_level = "mid"
+        b_reasons = ["实验室出现高危，实验室老师处置中"]
+    else:
+        b_level, b_reasons = "low", []
+
+    def pack(tier: str, level: str, **extra) -> Dict[str, Any]:
+        return dict({"name": TIER_NAMES[tier], "level": level, "level_text": LEVEL_TEXT[level],
+                     "action": TIER_ACTION[tier][level]}, **extra)
+
+    return {
+        "student": pack("student", r["level"], score=r["score"]),
+        "teacher": pack("teacher", t_level, score=t_score, reasons=[x["text"] for x in reasons], notes=notes),
+        "building": pack("building", b_level, reasons=b_reasons),
+    }

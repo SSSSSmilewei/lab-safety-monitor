@@ -4,6 +4,10 @@
   var LG = window.LG, esc = LG.esc, icon = LG.icon;
   var st = { room: null, riskOnly: false, mode: 'list' };
   try { st.mode = localStorage.getItem('lg.ov.mode') === 'map' ? 'map' : 'list'; } catch (e) { /* 浏览器禁用存储时用默认 */ }
+  // 分层上报视角：building 实验楼 / teacher 实验室 / student 学生端；null = 按账号角色（管理员看实验楼，教师看实验室）
+  var TIERS = { building: '实验楼', teacher: '实验室', student: '学生端' };
+  var TIER_NOTE = { building: '仅断电锁定与紧急事件', teacher: '加热、温度、烟雾、断电与呼叫', student: '与实验台提醒一致' };
+  try { st.tier = TIERS[localStorage.getItem('lg.ov.tier')] ? localStorage.getItem('lg.ov.tier') : null; } catch (e) { st.tier = null; }
 
   function riskOrder(lv) { return { high: 0, mid: 1, low: 2, off: 3, none: 4 }[lv]; }
 
@@ -52,7 +56,7 @@
     if (!q.length) return '<div class="empty">' + icon('ok', 28) + '<div>无待处置事项</div></div>';
     return q.map(function (d) {
       var lv = LG.deskLevel(d), L = LG.LV[lv];
-      var why = (d.events || []).join(' · ') || d.scene || '';
+      var why = (d.reasons && d.reasons.length ? d.reasons : d.events || []).join(' · ') || d.scene || '';
       if (d.call) why = d.call.who + '在终端上呼叫教师（' + LG.ago(d.call.ts) + '）' + (why ? ' · ' + why : '');
       return '<div class="q-item ' + (lv === 'high' || d.call ? 'high' : '') + '"><i class="bar" aria-hidden="true" style="background:' + (d.call ? 'var(--high)' : L.color) + '"></i>' +
         '<span class="' + (d.call ? 'tag t-high' : L.tag) + '">' + (d.call ? '求助' : d.latched ? '断电锁定' : L.text) + '</span>' +
@@ -166,7 +170,8 @@
     render: function (main) {
       main.innerHTML =
         '<section class="panel stats" aria-label="运行概况" id="ovStats"></section>' +
-        '<div class="cols"><section class="panel" aria-label="处置队列" style="flex:3 1 520px"><div class="ph">' + icon('alert') + '处置队列<span class="sp"></span><small>按风险等级排序</small></div><div id="ovQueue"></div></section>' +
+        '<div class="cols"><section class="panel" aria-label="处置队列" style="flex:3 1 520px"><div class="ph">' + icon('alert') + '处置队列<span class="sp"></span><small id="ovTierNote"></small>' +
+        '<span class="seg" aria-label="上报层级">' + Object.keys(TIERS).map(function (k) { return '<button class="btn" data-tier="' + k + '">' + TIERS[k] + '</button>'; }).join('') + '</span></div><div id="ovQueue"></div></section>' +
         '<section class="panel" aria-label="区域筛选" style="flex:1 1 240px"><div class="ph">' + icon('building') + '区域筛选</div><div id="ovRooms"></div></section></div>' +
         '<section class="panel" aria-label="实验桌状态"><div class="ph">' + icon('desk') + '实验桌状态<span class="sp"></span>' +
         '<span class="seg"><button class="btn" data-m="list" aria-label="列表">' + icon('list', 16) + '列表</button><button class="btn" data-m="map" aria-label="平面图">' + icon('plan', 16) + '平面图</button></span>' +
@@ -183,10 +188,18 @@
         LG.$$('.planwrap', box).forEach(function (w, i) { w.scrollLeft = sx[i] || 0; });   // 窄屏横向滚动位置在刷新后保留
         LG.$$('[data-f]', main).forEach(function (b) { b.classList.toggle('on', (b.dataset.f === 'risk') === st.riskOnly); });
         LG.$$('[data-m]', main).forEach(function (b) { b.classList.toggle('on', b.dataset.m === st.mode); });
+        LG.$$('[data-tier]', main).forEach(function (b) { b.classList.toggle('on', b.dataset.tier === last.tier); });
+        LG.$('#ovTierNote').textContent = (TIERS[last.tier] || '') + '视角 · ' + (TIER_NOTE[last.tier] || '');
       }
       main.addEventListener('click', function (e) {
-        var t = e.target.closest('[data-room], [data-f], [data-m], [data-cut], [data-ack]');
+        var t = e.target.closest('[data-room], [data-f], [data-m], [data-cut], [data-tier], [data-ack]');
         if (!t) return;
+        if (t.dataset.tier) {
+          st.tier = t.dataset.tier;
+          try { localStorage.setItem('lg.ov.tier', st.tier); } catch (x) { /* 忽略 */ }
+          refresh();
+          return;
+        }
         if (t.dataset.m) {
           st.mode = t.dataset.m;
           try { localStorage.setItem('lg.ov.mode', st.mode); } catch (x) { /* 忽略 */ }
@@ -201,9 +214,10 @@
         }
         paint();
       });
-      LG.every(2000, function () {
-        LG.api('GET', '/api/overview').then(function (ov) { last = ov; paint(); }).catch(LG.fail);
-      });
+      function refresh() {
+        LG.api('GET', '/api/overview' + (st.tier ? '?tier=' + st.tier : '')).then(function (ov) { last = ov; paint(); }).catch(LG.fail);
+      }
+      LG.every(2000, refresh);
       LG.every(15000, function () { LG.loadTree(true).then(paint); });
     }
   });
