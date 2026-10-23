@@ -62,7 +62,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
 | `tools/` | `center_demo.py` 总后台演示（示例楼栋与账号 + 模拟终端上报，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（75 项）、`test_platform.py`（44 项）、`test_center.py`（41 项，总后台）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tests/` | `test_backend.py`（75 项）、`test_platform.py`（44 项）、`test_center.py`（56 项，总后台 + 开发板接入）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）。有 `*_rknn_model/` 目录时优先用 NPU |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -152,7 +152,7 @@ python run_app.py                          # 电脑大窗口 + 网页 http://127
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
 python tests/test_backend.py               # 75 项，无需硬件
 python tests/test_platform.py              # 44 项，无需硬件和大模型
-python tests/test_center.py                # 41 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格
+python tests/test_center.py                # 56 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格、开发板 CenterLink 真实 HTTP 接入
 python run_center.py                       # 总后台 http://127.0.0.1:8200（首次启动打印 admin 初始密码）
 python tools/center_demo.py                # 总后台演示数据 http://127.0.0.1:8210（账号见脚本开头）
 python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 requirements-host.txt）
@@ -192,7 +192,7 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 ## 12. 当前状态
 
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、开发板本机控制台、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、交叉验证（三级风险 + 处置动作）、台面安全区。
-- 总后台（2026-10-23）：后端 + 网页前端完成，浏览器实测通过（`tools/center_demo.py` 演示数据）；尚未与真实开发板联调上报。模型看板的训练集图片数需管理员在页面上填写（数据集不在仓库里）；语音合成需在总后台机器上 `pip install edge-tts` 且联网。
+- 总后台（2026-10-23）：后端 + 网页前端完成，浏览器实测通过（`tools/center_demo.py` 演示数据）；开发板程序（`center_link.py`）与总后台已在本机联调通过（上报、阈值下发与硬上限拦截、远程断电 / 静音、画面与问答代理、断线重连、离线判定，另有自动测试），尚未在真实开发板上跑。模型看板的训练集图片数需管理员在页面上填写（数据集不在仓库里）；语音合成需在总后台机器上 `pip install edge-tts` 且联网。
 - 未验证：ESP32 固件已烧录真机并确认串口协议正常（2026-10-22 更新），但外设接线尚未开始，断电 / ACK / 复位、语音、烟雾全流程未实测；开发板（RK3588）已到手装好系统、NPU 推理正常（据队员反馈），开机自启未实测。V-JEPA 2 功能已按计划移除。
 - 截图和演示视频是电脑屏幕录像，不是真实实验台画面。
 - 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」，不是默认：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`）；开发板本机控制台按浏览器切换（恢复旧版靛蓝描边 + Zpix）；实验台小屏用 `config.yaml → ui.style: pixel`。电脑大窗口（main_window.py）保持旧版。

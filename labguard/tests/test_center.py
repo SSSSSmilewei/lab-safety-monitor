@@ -153,4 +153,121 @@ con.commit(); con.close()
 from center.store import Store
 check(Store(old).user(1)["ui_style"] == "standard", "旧数据库自动补上界面风格字段")
 
+# ---------------------------------------------------------------------------
+print("[6] 开发板 CenterLink 经真实 HTTP 接入总后台")
+import socket
+import threading
+import time
+import urllib.error
+
+import uvicorn
+
+from src import config as config_mod
+
+config_mod.load()
+config_mod._override_path = lambda: os.path.join(_tmp, "override.yaml")   # 不写真实 runtime/
+config_mod._config["events"]["db"] = os.path.join(_tmp, "events.db")
+config_mod._config["events"]["snapshot_dir"] = os.path.join(_tmp, "snaps")
+config_mod._config["notify"]["webhook_url"] = ""
+from src.core import voice as voice_mod
+voice_mod.pack_dir = lambda: os.path.join(_tmp, "board_voice")
+from src.core.center_link import CenterLink
+from src.config import cfg
+
+
+class FakeEngine:
+    """只实现 CenterLink 用到的几个接口"""
+    extensions, dual_system = {}, None
+
+    def __init__(self):
+        self.cuts, self.mutes = [], []
+
+    def snapshot(self):
+        return {"state": "NORMAL", "latched": False, "risk": {"level": "low"},
+                "world_model": {"phase": "idle", "temp": 25.0, "history": [25.0] * 120, "forecast": [1] * 12},
+                "center": {"online": True}}
+
+    def cut_power(self, source):
+        self.cuts.append(source)
+        return "未接入下位机（演示模式），已在软件中模拟断电锁定"
+
+    def mute(self, seconds):
+        self.mutes.append(seconds)
+        return time.time() + seconds
+
+
+with socket.socket() as sk:
+    sk.bind(("127.0.0.1", 0))
+    port = sk.getsockname()[1]
+server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+threading.Thread(target=server.run, daemon=True).start()
+for _ in range(100):
+    if server.started:
+        break
+    time.sleep(0.05)
+
+phys = store.create_area("物理楼", None, "group")
+desk9 = store.create_area("9号桌", store.create_area("H实验室", phys, "room"), "desk")
+tok = store.create_node("LG-H09", desk9)["token"]
+eng = FakeEngine()
+config_mod._config["center"].update({"url": "", "node_token": ""})
+link = CenterLink(eng)                      # 先不填地址：不启动后台线程，测试里手动 report_once()
+check(not link.enabled and link._thread is None, "未配置总后台地址时不启动上报线程")
+config_mod._config["center"].update({"url": f"http://127.0.0.1:{port}", "node_token": "lg_wrong"})
+try:
+    link.report_once()
+    bad = None
+except urllib.error.HTTPError as e:
+    bad = e.code
+check(bad == 401, "节点密钥错误 → 401")
+config_mod._config["center"]["node_token"] = tok
+link.report_once()
+n9 = store.node_by_area(desk9)
+check(link.online and n9["last_ip"] == "127.0.0.1" and n9["hard_limit_c"] == 150.0, "上报成功，总后台记下终端地址与硬上限")
+check(link.center_key == store.meta("center_key"), "终端拿到总后台访问密钥")
+wm = n9["snapshot"]["world_model"]
+check("history" not in wm and "forecast" not in wm and "center" not in n9["snapshot"], "上报快照裁掉温度曲线")
+
+r = admin.put(f"/api/profiles/{desk9}", json={"rules": {"rules.dry_burn_c": 110}})
+check(r.status_code == 200, "总后台为实验桌设置干烧阈值 110℃")
+link.report_once()
+check(cfg("rules.dry_burn_c") == 110 and not link.profile_errors, "终端应用下发的阈值")
+admin.put(f"/api/profiles/{desk9}", json={"rules": {"rules.dry_burn_c": 160}})
+link.report_once()
+check(cfg("rules.dry_burn_c") == 110 and "rules.dry_burn_c" in link.profile_errors,
+      "超过本机控制盒硬上限的阈值不生效，并回报原因")
+link.report_once()
+prof = admin.get(f"/api/profiles/{desk9}").json()
+check("rules.dry_burn_c" not in prof["nodes"][0]["applied"] and prof["nodes"][0]["warnings"],
+      "总后台看到该项未生效及硬上限提示")
+
+admin.post(f"/api/desks/{desk9}/command", json={"cmd": "cut_power", "confirm": True})
+admin.post(f"/api/desks/{desk9}/command", json={"cmd": "mute", "seconds": 30})
+link.report_once()
+check(len(eng.cuts) == 1 and eng.cuts[0].startswith("总后台·") and eng.mutes == [30], "终端执行断电与静音指令")
+link.report_once()
+results = {c["cmd"]: c["result"] for c in store.commands_of(n9["id"])}
+check(results.get("cut_power", "").startswith("未接入下位机") and results.get("mute", "").startswith("已静音至"),
+      "执行结果回写到总后台")
+check(link.run_command({"cmd": "power_on"}) == "不支持的指令", "终端不执行任何上电指令")
+
+vdir = os.path.join(_tmp, "center_files", "voice")
+with open(os.path.join(vdir, "t9.mp3"), "wb") as f:
+    f.write(b"ID3-test-audio")
+aid = store.add_voice_asset("干烧提醒", "upload", "t9.mp3", "admin")
+store.set_voice_map(desk9, "dry_burn", "stern", aid)
+link.report_once()
+with open(os.path.join(_tmp, "board_voice", f"{aid}.mp3"), "rb") as f:
+    got = f.read()
+check(got == b"ID3-test-audio" and voice_mod.voice.pack["map"]["dry_burn"]["stern"] == f"{aid}.mp3",
+      "终端下载并安装语音包")
+v0 = link.voice_version
+link.report_once()
+check(link.voice_version == v0, "语音包版本未变时不重复下载")
+
+server.should_exit = True
+time.sleep(0.5)
+link._fail("URLError: 连接被拒绝")
+check(not link.online and "连接被拒绝" in link.status()["error"], "总后台断开时只记录状态，不影响本机")
+
 print(f"\n全部通过：{len(PASSED)} 项")
