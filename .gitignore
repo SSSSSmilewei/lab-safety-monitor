@@ -20,9 +20,13 @@ build/
 dist/
 *.egg-info/
 
-# ---- 导出的模型（体积大，按需重新导出）----
+# ---- 导出的模型（按需重新导出）----
+# labguard/models 下的 RKNN 模型（每个约 7MB）入库，板子拉下代码就能用 NPU；版本见各目录的 RKNN_VERSION
 *_rknn_model/
+!labguard/models/*_rknn_model/
 *.onnx
+# Rockchip 运行库，许可不允许原样再分发，不入库（setup.sh 会下载）
+labguard/deploy/orangepi/librknnrt.so
 
 # ---- 系统与编辑器 ----
 .DS_Store

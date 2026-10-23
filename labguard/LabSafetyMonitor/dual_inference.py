@@ -51,6 +51,11 @@ except Exception as e:
     VISION_IMPORT_ERROR = str(e)
     YOLO = None
     print(f"[dual_inference] ultralytics 加载失败（{e}），视觉模块将以离线状态运行")
+try:
+    from ultralytics.utils.checks import is_rockchip
+    ON_ROCKCHIP = is_rockchip()   # 只有 Rockchip 开发板上才有 NPU；电脑上直接跳过 RKNN 模型
+except Exception:
+    ON_ROCKCHIP = False
 
 
 class _OfflineModel:
@@ -253,50 +258,59 @@ class DualInferenceSystem:
             return val
         return src
 
-    def _find_model(self, stems: List[str], legacy: List[str]) -> Optional[str]:
+    def _find_models(self, stems: List[str], legacy: List[str]) -> List[str]:
+        """按 prefer_format 顺序列出候选模型，每种格式取找到的第一个"""
         meipass = getattr(sys, "_MEIPASS", None)
         roots = [r for r in [meipass, _project_root, os.path.dirname(_project_root), os.getcwd()] if r and os.path.isdir(r)]
         formats = cfg("vision.prefer_format", ["rknn", "onnx", "pt"]) or ["pt"]
+        found = []
         for fmt in formats:
+            cands = []
             for root in roots:
                 for stem in stems:
                     if fmt == "rknn":
-                        cand = os.path.join(root, "models", f"{stem}_rknn_model")
-                        if os.path.isdir(cand):
-                            return cand
+                        cands.append(os.path.join(root, "models", f"{stem}_rknn_model"))
                     elif fmt == "onnx":
-                        cand = os.path.join(root, "models", f"{stem}.onnx")
-                        if os.path.isfile(cand):
-                            return cand
+                        cands.append(os.path.join(root, "models", f"{stem}.onnx"))
                     elif fmt == "pt":
-                        cand = os.path.join(root, "models", f"{stem}.pt")
-                        if os.path.isfile(cand):
-                            return cand
-                        for rel in legacy:
-                            cand = os.path.join(root, rel)
-                            if os.path.isfile(cand):
-                                return cand
-        return None
+                        cands.append(os.path.join(root, "models", f"{stem}.pt"))
+                        cands += [os.path.join(root, rel) for rel in legacy]
+            hit = next((c for c in cands if (os.path.isdir(c) if fmt == "rknn" else os.path.isfile(c))), None)
+            if hit:
+                found.append(hit)
+        return found
 
     def _load_model(self, stems, label, legacy):
         if YOLO is None:
             self.vision_errors.append(f"{label}：ultralytics 未安装（{VISION_IMPORT_ERROR}）")
             return _OfflineModel(), {}
-        path = self._find_model(stems, legacy)
-        if path is None:
+        paths = self._find_models(stems, legacy)
+        if not paths:
             self.vision_errors.append(f"{label}：models/ 下未找到模型文件")
             return _OfflineModel(), {}
-        try:
-            model = YOLO(path, task="detect")
-            self.model_info[label] = path
-            if path.endswith("_rknn_model"):
-                # RKNN 模型的输入尺寸在导出时已固定，推理时必须使用相同尺寸
-                self._fixed_imgsz = int(cfg("vision.imgsz", 640))
-            print(f"[DualInference] 加载{label}: {path}")
-            return model, model.names
-        except Exception as e:
-            self.vision_errors.append(f"{label}加载失败：{e}")
-            return _OfflineModel(), {}
+        err = ""
+        for path in paths:
+            if path.endswith("_rknn_model") and not ON_ROCKCHIP:
+                continue
+            try:
+                model = YOLO(path, task="detect")
+                if path.endswith("_rknn_model"):
+                    # RKNN 模型的输入尺寸在导出时已固定，推理时必须使用相同尺寸
+                    imgsz = int(cfg("vision.imgsz", 640))
+                    # ultralytics 到第一次推理才真正加载 NPU，这里先试跑一次，失败就换下一种格式
+                    model(np.zeros((imgsz, imgsz, 3), np.uint8), verbose=False, imgsz=imgsz)
+                    self._fixed_imgsz = imgsz
+                self.model_info[label] = path
+                print(f"[DualInference] 加载{label}: {path}")
+                if err:
+                    events.log("NPU 模型没加载上", f"{label}改用 {os.path.basename(path)}（CPU，较慢）。原因：{err}",
+                               kind="model")
+                return model, model.names
+            except Exception as e:
+                err = str(e)
+                print(f"[DualInference] {label} {path} 加载失败：{e}")
+        self.vision_errors.append(f"{label}加载失败：{err}")
+        return _OfflineModel(), {}
 
     # ------------------------------------------------------------------
     # 控制接口

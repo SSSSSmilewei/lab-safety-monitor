@@ -6,7 +6,7 @@
 
 ## 1. 项目一句话
 
-化学实验室安全监测终端（第 22 届计算机设计大赛·嵌入式赛道，湖南涉外经济学院 3 队）。两个 USB 摄像头 + YOLO11 识别人员装备和台面器皿；ESP32 下位机采集温湿度 / 红外测温 / 烟雾并控制加热继电器；开发板（RK3588，Python）把识别结果和传感器数据交给规则判断，危险时让下位机断电。另有实验台小屏、网页大屏、安全助手（大模型）、温度预测、外部温湿度控制，以及可选的 V-JEPA 2 画面异常检测。
+化学实验室安全监测终端（第 22 届计算机设计大赛·嵌入式赛道，湖南涉外经济学院 3 队）。两个 USB 摄像头 + YOLO11 识别人员装备和台面器皿；ESP32 下位机采集温湿度 / 红外测温 / 烟雾并控制加热继电器；开发板（视美泰 AIOT-3588A，RK3588，Python）把识别结果和传感器数据交给规则判断，危险时让下位机断电。另有实验台小屏、网页大屏、安全助手（大模型）、温度预测、外部温湿度控制，以及可选的 V-JEPA 2 画面异常检测。
 
 ## 2. 不可违反的设计约束（改代码前必读）
 
@@ -57,13 +57,13 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `src/ui/main_window.py` (1590) | 电脑大窗口（项目最早的完整界面）；设计令牌类 `T`、`Card`、`Chip`、`load_pixel_font()` 被小屏复用 |
 | `LabSafetyMonitor/dual_inference.py` (849) | 摄像头读取 + 两个 YOLO 模型推理 + 在场判断 + 时间投票 + 伏案 + 桌边线；产出 `alarms` 字典和带框画面 |
 | `LabSafetyMonitor/serial_comm.py` (481) | 下位机串口协议（第 7 节）；单例 `SerialComm.get_shared()` |
-| `firmware/lab_guard_esp32/lab_guard_esp32.ino` (343) | ESP32-S3 固件（Arduino）。**尚未在真机上编译验证** |
+| `firmware/lab_guard_esp32/lab_guard_esp32.ino` | ESP32-S3 固件（Arduino）。已在 ESP32-S3-N8R8 真机编译烧录，编译参数见文件开头 |
 | `hub/jepa_worker.py` (247) | 电脑端 V-JEPA 2 画面异常检测（可选）；`--selftest` 不下载模型自检 |
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
-| `deploy/orangepi/` | 开发板安装（setup.sh）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
-| `tools/` | `center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型、`gen_voice.py` 生成语音文件 |
+| `deploy/orangepi/` | 开发板安装（setup.sh，视美泰 AIOT-3588A 和香橙派 5 通用）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
+| `tools/` | `center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型（x86 上运行，附模拟器对比）、`check_npu.py` 板子上检查 NPU（版本、加载、速度、和 .pt 对比）、`gen_voice.py` 生成语音文件 |
 | `tests/` | `test_backend.py`（80 项）、`test_platform.py`（44 项）、`test_center.py`（71 项，总后台 + 开发板接入 + 平面图与演示画面）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
-| `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）。有 `*_rknn_model/` 目录时优先用 NPU |
+| `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）、`*_rknn_model/`（导出好的 NPU 模型，FP16，入库）。只有在 Rockchip 板子上才用 RKNN；NPU 加载失败时自动改用 .pt 并记一条事件 |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
 ## 4. 数据流
@@ -131,6 +131,8 @@ ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/
 
 ## 8. 开发板本机控制台接口（`src/web/server.py`，端口 `web.port`，本仓库 config.yaml 为 8180）
 
+- 端口被占用（如 Dify / Docker）时自动顺延到 8081、8082……；实际网址（带口令）打印在启动窗口里，并写入 `runtime/web_url.txt`。`web_port()` 返回实际端口。
+
 - 除 `/`、`/static/*`、`/font/*`、`/api/ping` 外都要口令：请求头 `X-Token` 或 `?token=`。口令为 `web.token`，留空则自动生成并写入 `runtime/web_token.txt`。
 - 只读：`GET /api/snapshot`、`WS /ws`（2 Hz 推送 snapshot + 最近事件）、`GET /api/events`、`GET /api/events/{uid}/snapshot.jpg`、`GET /stream/{pano|desk}.mjpg`、`GET /api/frame/{pano|desk}.jpg`、`GET /api/config`、`/api/models`、`/api/media`、`/api/agent`、`/api/env`、`/api/demo`。
 - 写：`PATCH /api/config`（仅 `TUNABLE` 白名单 + 范围校验）、`PUT /api/desk/zone`（台面安全区，`{points, danger, margin}`，points 为空则清除）、`POST /api/model`、`/api/camera`、`/api/power/cut`（需 `{"confirm": true}`，**只能断电**）、`/api/mute`、`/api/events/{uid}/review`、`/api/manual_snapshot`、`/api/agent/config|test|ask|report`、`/api/events/{uid}/agent`、`/api/env/setpoint|manual`、`/api/demo/start|stop`、`/api/jepa/score`。
@@ -148,8 +150,9 @@ ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/
 
 ```bash
 cd labguard
-pip install -r requirements.txt          # Python 3.10–3.12
-python run_app.py                          # 电脑大窗口 + 网页 http://127.0.0.1:8180
+conda env create -f environment.yml       # 推荐：Python 3.12，电脑和开发板共用；之后 conda activate lab_safety
+pip install -r requirements.txt          # 或者不用 conda：Python 3.10–3.12
+python run_app.py                          # 电脑大窗口 + 网页（网址见启动窗口，本仓库 config.yaml 为 http://127.0.0.1:8180，端口被占用时自动顺延）
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
 python tests/test_backend.py               # 80 项，无需硬件
 python tests/test_platform.py              # 44 项，无需硬件和大模型
@@ -161,7 +164,10 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 
 - 测试会在临时目录建数据库，不会动 `runtime/`。改完代码两个测试都要显示"全部通过"。
 - 没有摄像头 / 下位机时：网页「参数」页播放演示视频（放在 `labguard/media/` 或仓库根的 `local_private/`）；「环境控制 → 演示数据」注入场景。
-- 开发板：`deploy/orangepi/setup.sh` 安装，`start.sh` 自启；NPU 模型用 `tools/export_rknn.py` 在 x86 上导出。
+- 开发板：`deploy/orangepi/setup.sh` 安装（默认装 Miniforge 并用 `environment.yml` 建 conda 环境，有 `/userdata` 时装到 `/userdata/miniforge3`，可用 `LABGUARD_CONDA_DIR` 指定；`LABGUARD_USE_VENV=1` 走系统 Python + venv），`start.sh` 自启；装完运行 `python tools/check_npu.py` 检查 NPU。
+- NPU 版本必须三处一致：导出用的 rknn-toolkit2、板子上的 rknn-toolkit-lite2、`/usr/lib/librknnrt.so`，目前都是 **2.3.2**（`export_rknn.py` 的 `RKNN_VERSION`、`setup.sh` 的 `RKNN_VERSION`、`models/*_rknn_model/RKNN_VERSION`）。setup.sh 发现运行库版本不对会备份成 `.bak` 再替换。不要用 2.5.0（转换 YOLO11 报错）；导出时 numpy 必须 <2。改了 .pt 要重新运行 `tools/export_rknn.py`（x86 Linux / WSL2）并提交新的 `*_rknn_model/`。
+- 闪退排查：Python 报错和底层崩溃都记在 `runtime/crash.log`。PySide6 6.12 在 Python 3.10 / 3.11 上会闪退（界面画几秒就崩），`requirements.txt` 已限制 `<6.12`，`run_app.py` 启动时也会检查。
+- `.sh` 必须是 LF 换行、`.bat` 用 CRLF（`.gitattributes` 已规定），否则开发板上的脚本会报 `$'\r': command not found`。
 
 ## 10. 常见问题去哪找
 
@@ -179,6 +185,7 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 | 固件引脚、本地规则 | `firmware/lab_guard_esp32/lab_guard_esp32.ino` 顶部常量 |
 | 采购清单、硬件接线 | `docs/开发记录/修改说明与落地计划.md` 第 3、4 节 |
 | 早期代码审查结论 | `docs/开发记录/代码审查与改进方案.md` |
+| 评委视角的问题清单和瘦身计划（待执行） | `docs/开发记录/评委视角审查与瘦身计划.md` |
 | 旧版本代码 | git 标签 `v1-prototype`（最初原型）、`v2-before-restructure`（整理目录前） |
 
 ## 11. 代码约定
@@ -194,6 +201,7 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、开发板本机控制台、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、交叉验证（三级风险 + 处置动作）、台面安全区。
 - 总后台（2026-10-23）：后端 + 网页前端完成，浏览器实测通过（`tools/center_demo.py` 演示数据）；开发板程序（`center_link.py`）与总后台已在本机联调通过（上报、阈值下发与硬上限拦截、远程断电 / 静音、画面与问答代理、断线重连、离线判定，另有自动测试），尚未在真实开发板上跑。模型看板的训练集图片数需管理员在页面上填写（数据集不在仓库里）；语音合成需在总后台机器上 `pip install edge-tts` 且联网。
-- 未验证：ESP32 固件已烧录真机并确认串口协议正常（2026-10-22 更新），但外设接线尚未开始，断电 / ACK / 复位、语音、烟雾全流程未实测；开发板（RK3588）已到手装好系统、NPU 推理正常（据队员反馈），开机自启未实测。V-JEPA 2 功能已按计划移除。
+- 开发板：视美泰 AIOT-3588A（4GB，系统在 16GB TF 卡，Ubuntu 22.04）已调通小屏、USB 摄像头、开机自启（edge 模式）。RKNN 模型已导出（rknn-toolkit2 2.3.2，FP16），真机 NPU 实测（`tools/check_npu.py`）ppe_best 120 ms/帧、chem_best 116 ms/帧，结果与 .pt 一致。
+- ESP32 固件：已在 ESP32-S3-N8R8 真机烧录，串口协议、断电 ACK 往返（中位 4.9 ms）实测正常；蜂鸣器为非阻塞。传感器、继电器、控制键接上后的整机联调未完成。V-JEPA 2 功能已按计划移除。
 - 截图和演示视频是电脑屏幕录像，不是真实实验台画面。
 - 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」，不是默认：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`）；开发板本机控制台按浏览器切换（恢复旧版靛蓝描边 + Zpix）；实验台小屏用 `config.yaml → ui.style: pixel`。电脑大窗口（main_window.py）保持旧版。
