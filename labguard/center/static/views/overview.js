@@ -46,16 +46,19 @@
   }
 
   function queueHtml(ov) {
-    var q = ov.desks.filter(function (d) { var lv = LG.deskLevel(d); return lv === 'high' || lv === 'mid'; });
-    q.sort(function (a, b) { return riskOrder(LG.deskLevel(a)) - riskOrder(LG.deskLevel(b)); });
+    var q = ov.desks.filter(function (d) { var lv = LG.deskLevel(d); return d.call || lv === 'high' || lv === 'mid'; });
+    // 终端求助排最前，其余按风险等级
+    q.sort(function (a, b) { return (b.call ? 1 : 0) - (a.call ? 1 : 0) || riskOrder(LG.deskLevel(a)) - riskOrder(LG.deskLevel(b)); });
     if (!q.length) return '<div class="empty">' + icon('ok', 28) + '<div>无待处置事项</div></div>';
     return q.map(function (d) {
       var lv = LG.deskLevel(d), L = LG.LV[lv];
       var why = (d.events || []).join(' · ') || d.scene || '';
-      return '<div class="q-item ' + (lv === 'high' ? 'high' : '') + '"><i class="bar" aria-hidden="true" style="background:' + L.color + '"></i>' +
-        '<span class="' + L.tag + '">' + (d.latched ? '断电锁定' : L.text) + '</span>' +
+      if (d.call) why = d.call.who + '在终端上呼叫教师（' + LG.ago(d.call.ts) + '）' + (why ? ' · ' + why : '');
+      return '<div class="q-item ' + (lv === 'high' || d.call ? 'high' : '') + '"><i class="bar" aria-hidden="true" style="background:' + (d.call ? 'var(--high)' : L.color) + '"></i>' +
+        '<span class="' + (d.call ? 'tag t-high' : L.tag) + '">' + (d.call ? '求助' : d.latched ? '断电锁定' : L.text) + '</span>' +
         '<div class="grow" style="flex:1 1 240px"><div style="font-weight:600">' + esc(d.path) + (d.scene ? ' · ' + esc(d.scene) : '') + '</div>' +
         '<div style="color:' + (lv === 'high' ? 'var(--high-deep)' : 'var(--mid-deep)') + '">' + esc(why) + '</div></div>' +
+        (d.call ? '<button class="btn" data-ack="' + d.area_id + '">' + icon('ok') + '已知晓</button>' : '') +
         '<a class="btn" href="#/desk/' + d.area_id + '">' + icon('camera') + '详情</a>' +
         (d.latched ? '' : '<button class="btn dng" data-cut="' + d.area_id + '" data-path="' + esc(d.path) + '">' + icon('power') + '断电</button>') + '</div>';
     }).join('');
@@ -78,7 +81,7 @@
         '<div class="deskgrid">' + ds.map(function (x) {
           var d = x.d, L = LG.LV[x.lv];
           var scene = !d ? '未绑定终端' : !d.online ? '终端离线' : (d.latched ? '断电锁定' : d.scene || d.state_text || '');
-          var reason = !d ? '在「区域」页登记终端' : !d.online ? '控制盒本地防护运行中' : (d.events || []).join(' · ') || '无风险因素';
+          var reason = !d ? '在「区域」页登记终端' : !d.online ? '控制盒本地防护运行中' : (d.call ? '呼叫教师 · ' : '') + ((d.events || []).join(' · ') || (d.call ? '' : '无风险因素'));
           return '<a class="deskcard ' + L.card + '" href="#/desk/' + x.area.id + '"><div class="stripe" style="background:' + L.color + '"></div><div class="in">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="hd" style="font-size:16px">' + esc(x.area.name) + '</span>' +
             '<span class="' + L.tag + '">' + (d && d.latched ? '锁定' : L.text) + '</span></div>' +
@@ -182,7 +185,7 @@
         LG.$$('[data-m]', main).forEach(function (b) { b.classList.toggle('on', b.dataset.m === st.mode); });
       }
       main.addEventListener('click', function (e) {
-        var t = e.target.closest('[data-room], [data-f], [data-m], [data-cut]');
+        var t = e.target.closest('[data-room], [data-f], [data-m], [data-cut], [data-ack]');
         if (!t) return;
         if (t.dataset.m) {
           st.mode = t.dataset.m;
@@ -190,6 +193,12 @@
         } else if (t.hasAttribute('data-room')) st.room = t.dataset.room === '' ? null : t.dataset.room;
         else if (t.dataset.f) st.riskOnly = t.dataset.f === 'risk';
         else if (t.dataset.cut) { LG.cutPower(t.dataset.cut, t.dataset.path); return; }
+        else if (t.dataset.ack) {
+          LG.api('POST', '/api/desks/' + t.dataset.ack + '/call_ack').then(function () {
+            LG.toast('已确认求助'); return LG.api('GET', '/api/overview');
+          }).then(function (ov) { last = ov; paint(); }).catch(LG.fail);
+          return;
+        }
         paint();
       });
       LG.every(2000, function () {

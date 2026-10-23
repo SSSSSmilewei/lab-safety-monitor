@@ -22,6 +22,18 @@ body { background: var(--bg); color: var(--ink); font-family: var(--f-body); fon
 a { color: var(--ink); } a:hover { color: var(--primary); }
 button, input, select, textarea { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
+/* 背景动画（沿用最初版本）：45° 斜向移动的淡蓝点阵 + 两层反向流动的海浪。
+   只用 transform 动画，由浏览器合成，不重排页面；在看网页的电脑上渲染，开发板不参与。系统设置「减少动态效果」时静止。 */
+.bgfx { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bgfx .dots { position: absolute; top: -60px; left: -60px; right: 0; bottom: 0; background-image: radial-gradient(circle, rgba(129,212,250,0.6) 2px, transparent 2.5px); background-size: 60px 60px; animation: bgfx-drift 1.2s linear infinite; will-change: transform; }
+.bgfx .wave { position: absolute; left: 0; bottom: 0; height: 160px; background-repeat: repeat-x; will-change: transform; }
+.bgfx .w1 { width: calc(100% + 940px); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='940' height='160'%3E%3Cpath d='M0 60 Q235 8 470 60 T940 60 V160 H0Z' fill='rgba(129,212,250,0.55)'/%3E%3C/svg%3E"); background-size: 940px 160px; animation: bgfx-w1 6s linear infinite; }
+.bgfx .w2 { width: calc(100% + 628px); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='628' height='160'%3E%3Cpath d='M0 90 Q157 126 314 90 T628 90 V160 H0Z' fill='rgba(92,107,192,0.32)'/%3E%3C/svg%3E"); background-size: 628px 160px; animation: bgfx-w2 4s linear infinite; }
+@keyframes bgfx-drift { to { transform: translate(60px, 60px); } }
+@keyframes bgfx-w1 { from { transform: translateX(-940px); } to { transform: translateX(0); } }
+@keyframes bgfx-w2 { from { transform: translateX(0); } to { transform: translateX(-628px); } }
+@media (prefers-reduced-motion: reduce) { .bgfx .dots, .bgfx .wave { animation: none; } }
+#root { position: relative; z-index: 1; }
 .hd { font-family: var(--f-hd); font-weight: normal; }
 .num, .big { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
 .big { font-size: 26px; font-weight: 700; line-height: 1.1; }

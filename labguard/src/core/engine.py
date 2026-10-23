@@ -98,6 +98,7 @@ class SafetyEngine(QObject):
         self._frame_seq = 0
         self._jpeg_cache: Dict[str, tuple] = {}
         self._mute_until = 0.0
+        self.last_call: Optional[Dict[str, Any]] = None   # 最近一次「呼叫教师」，随快照上报总后台
         self.extensions: Dict[str, Any] = {}   # agent / env / jepa 等可选模块挂在这里
 
         self.inference_thread.update_frames_signal.connect(self._on_frames)
@@ -256,6 +257,7 @@ class SafetyEngine(QObject):
         return self._mute_until
 
     def call_admin(self, who: str = "实验员") -> None:
+        self.last_call = {"ts": time.time(), "who": str(who)[:20]}
         events.log("呼叫管理员", f"{who}在终端上发起求助", level="WARNING", kind="call_admin", snapshot=True)
 
     # ------------------------------------------------------------------
@@ -313,6 +315,7 @@ class SafetyEngine(QObject):
             "active_events": [{k: e.get(k) for k in ("kind", "level", "title", "message", "time_str", "uid")}
                               for e in active if e.get("level") != "INFO"],
             "stats": events.stats(),
+            "call": self.last_call,
             "mute_until": self._mute_until if self._mute_until > time.time() else 0,
             "rules": {k: cfg(f"rules.{k}") for k in ("dry_burn_c", "heating_on_c", "unattended_heating_cut_s",
                                                        "smoke_raw", "humidity_high", "ambient_high_c",

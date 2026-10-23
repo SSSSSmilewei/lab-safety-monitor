@@ -16,7 +16,7 @@
 4. **下位机本地硬规则独立于开发板**：热源 ≥150℃、烟雾 ≥2500、30 秒收不到心跳且仍在加热 → 断电；上电时继电器默认断开。这些阈值写在固件里，网页上改不了；`config.yaml → hardware` 要和烧进固件的值一致，网页上的断电阈值只能设在它以下。现场复位时热源 ≥120℃ 或烟雾 ≥1800（与开发板默认断电阈值一致）会被拒绝。
 5. **心跳由安全判断驱动**：`SafetyStateMachine.evaluate()` 每次跑完调用 `SerialComm.feed()`，超过 `serial.engine_stale_s`（5 秒）没被调用就停发心跳，让下位机看门狗接管。不要在别处定时发心跳。
 6. **演示数据不能和真实数据混用**：接上下位机后 `/api/demo/start` 和播放演示视频都返回 409，正在播放的演示视频会自动切回摄像头。
-7. **API Key 只放环境变量**（默认 `DASHSCOPE_API_KEY`），网页上填的 Key 只存在内存里，不写文件、不回显。不要把 Key 写进 `config.yaml` 或提交到仓库。
+7. **API Key 只放环境变量**（默认 `DASHSCOPE_API_KEY`），网页上填的 Key 只存在内存里，不写文件、不回显。不要把 Key 写进 `config.yaml` 或提交到仓库。开发板开机自启读不到 `~/.bashrc`，`start.sh` 会加载仓库外的 `~/.config/labguard/env`（每行 `KEY=值`，chmod 600）。没有 Key 也没有本地模型时，安全助手只能用规则模板（回答末尾标「规则模板（离线兜底）」）。
 8. **界面文案用正式的产品用语**（名词短语，如"授权范围""处置队列""阈值配置"），不写口语化的解释句；但也不要写"感知 → 预测 → 研判 → 执行"这类口号，不用"研判、闭环、态势、赋能"这类词。界面布局和配色是队长精心设计的，除非被要求，否则不要改。（给 AI 助手回答队员问题时仍用大白话。）
 
 ## 3. 仓库结构
@@ -61,8 +61,8 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `hub/jepa_worker.py` (247) | 电脑端 V-JEPA 2 画面异常检测（可选）；`--selftest` 不下载模型自检 |
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh，视美泰 AIOT-3588A 和香橙派 5 通用）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
-| `tools/` | `center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面、`--live LG-A01` 把一张桌留给真实开发板程序接入，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型（x86 上运行，附模拟器对比）、`check_npu.py` 板子上检查 NPU（版本、加载、速度、和 .pt 对比）、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（80 项）、`test_platform.py`（44 项）、`test_center.py`（71 项，总后台 + 开发板接入 + 平面图与演示画面）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tools/` | `center_init.py` 总后台正式初始化（一栋楼 / 一间实验室 / 一张实验桌 + 一台终端 + 一个教师账号，无模拟数据，`--local` 把节点密钥写进本机配置）、`center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面、`--live LG-A01` 把一张桌留给真实开发板程序接入，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型（x86 上运行，附模拟器对比）、`check_npu.py` 板子上检查 NPU（版本、加载、速度、和 .pt 对比）、`gen_voice.py` 生成语音文件 |
+| `tests/` | `test_backend.py`（80 项）、`test_platform.py`（44 项）、`test_center.py`（74 项，总后台 + 开发板接入 + 平面图与演示画面 + 呼叫教师）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）、`*_rknn_model/`（导出好的 NPU 模型，FP16，入库）。只有在 Rockchip 板子上才用 RKNN；NPU 加载失败时自动改用 .pt 并记一条事件 |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -156,7 +156,7 @@ python run_app.py                          # 电脑大窗口 + 网页（网址�
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
 python tests/test_backend.py               # 80 项，无需硬件
 python tests/test_platform.py              # 44 项，无需硬件和大模型
-python tests/test_center.py                # 71 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格、开发板 CenterLink 真实 HTTP 接入、平面图与演示画面
+python tests/test_center.py                # 74 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格、开发板 CenterLink 真实 HTTP 接入、平面图与演示画面
 python run_center.py                       # 总后台 http://127.0.0.1:8200（首次启动打印 admin 初始密码）
 python tools/center_demo.py                # 总后台演示数据 http://127.0.0.1:8210（账号见脚本开头）
 python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 requirements-host.txt）
@@ -195,10 +195,12 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 - 跨线程只通过加锁的快照或 Qt 信号；网页线程不直接碰 numpy 画面，只取 `latest_jpeg()` 编码好的字节。
 - 读配置一律用 `cfg("a.b", 默认值)`；新配置项同时加到 `src/config.py` 的 `DEFAULTS` 和 `config.yaml`（带中文注释）。
 - 事件统一走 `events.update()`（持续性状态）或 `events.log()`（一次性），不要自己写数据库或播语音。
-- 香橙派性能：不要在界面里加动画或高频重绘；小屏画面最多 10 fps；网页画面只在有人看时编码。
+- 香橙派性能：小屏（Qt）不要加动画或高频重绘（整屏重画会和摄像头、识别抢 CPU）；网页背景的点阵 / 海浪动画在看网页的电脑上渲染，只用 CSS transform，不影响开发板；小屏画面最多 10 fps；网页画面只在有人看时编码。
 
 ## 12. 当前状态
 
+- 呼叫教师：小屏「呼叫教师」→ `engine.last_call` 随快照上报 → 总后台处置队列置顶「求助」，老师点「已知晓」（`POST /api/desks/{id}/call_ack`，只在总后台记录）后消失，10 分钟未处理也自动消失。
+- 没接控制盒时终端用模拟温湿度维持界面（`telemetry.source = simulated`），总后台实验桌页和小屏不显示这些数值，标「控制盒未接入」。
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、开发板本机控制台、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、交叉验证（三级风险 + 处置动作）、台面安全区。
 - 总后台（2026-10-23）：后端 + 网页前端完成，浏览器实测通过（`tools/center_demo.py` 演示数据）；开发板程序（`center_link.py`）与总后台已在本机联调通过（上报、阈值下发与硬上限拦截、远程断电 / 静音、画面与问答代理、断线重连、离线判定，另有自动测试），尚未在真实开发板上跑。模型看板的训练集图片数需管理员在页面上填写（数据集不在仓库里）；语音合成需在总后台机器上 `pip install edge-tts` 且联网。
 - 开发板：视美泰 AIOT-3588A（4GB，系统在 16GB TF 卡，Ubuntu 22.04）已调通小屏、USB 摄像头、开机自启（edge 模式）。RKNN 模型已导出（rknn-toolkit2 2.3.2，FP16），真机 NPU 实测（`tools/check_npu.py`）ppe_best 120 ms/帧、chem_best 116 ms/帧，结果与 .pt 一致。

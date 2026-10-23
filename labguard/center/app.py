@@ -37,6 +37,7 @@ STATIC_DIR = os.path.join(HERE, "static")
 ZPIX_PATH = os.path.join(ROOT, "LabSafetyMonitor", "Zpix.ttf")
 COOKIE = "lg_session"
 ONLINE_S = 10.0              # 超过这么久没上报视为离线
+CALL_S = 600.0               # 终端「呼叫教师」在总览里保留多久（老师点「已知晓」后立即消失）
 LOCK_FAILS, LOCK_S = 5, 300
 DEMO_MIMES = {"image/jpeg": b"\xff\xd8", "image/png": b"\x89PNG", "image/webp": b"RIFF"}
 DEMO_MAX_BYTES = 3 * 1024 * 1024
@@ -346,7 +347,22 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
                 "state": s.get("state"), "state_text": s.get("state_text"), "latched": s.get("latched"),
                 "risk_level": risk.get("level"), "risk_text": risk.get("level_text"), "scene": risk.get("scene"),
                 "obj_temp": tel.get("obj_temp"), "temp": tel.get("temp"), "humi": tel.get("humi"),
-                "events": [e.get("title") for e in (s.get("active_events") or [])[:3]]}
+                "events": [e.get("title") for e in (s.get("active_events") or [])[:3]],
+                "call": _pending_call(n)}
+
+    def _pending_call(n: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """终端上报的求助：未被确认、且在 CALL_S 秒内的才算待处理"""
+        c = (n.get("snapshot") or {}).get("call")
+        if not isinstance(c, dict):
+            return None
+        try:
+            ts = float(c.get("ts") or 0)
+        except (TypeError, ValueError):
+            return None
+        ack = float(store.meta(f"call_ack:{n['id']}", "0") or 0)
+        if ts <= ack or time.time() - ts > CALL_S:
+            return None
+        return {"ts": ts, "who": str(c.get("who") or "实验员")[:20]}
 
     @app.get("/api/nodes")
     def list_nodes(u=Depends(current_user)):
@@ -473,6 +489,7 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
         meta = {k: n.get(k) for k in ("id", "name", "last_seen", "last_ip", "web_port", "hard_limit_c",
                                       "smoke_limit_raw", "applied_profile")}
         meta["online"] = _online(n)
+        meta["call"] = _pending_call(n)
         return {"area": store.area(area_id), "path": store.path_name(area_id), "node": meta,
                 "snapshot": n.get("snapshot") or {}, "commands": store.commands_of(n["id"], 10),
                 "demo": sorted(store.demo_frame_info().get(area_id, {}))}
@@ -553,6 +570,17 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
         n = _desk_node(u, area_id)
         raw = await asyncio.to_thread(_node_http, n, "/api/agent/report", {}, 90.0)
         return json.loads(raw.decode("utf-8"))
+
+    @app.post("/api/desks/{area_id}/call_ack")
+    def call_ack(area_id: int, u=Depends(current_user)):
+        """老师确认已看到终端的求助（只在总后台记录，不向终端下发任何指令）"""
+        n = _desk_node(u, area_id)
+        c = _pending_call(n)
+        if c is None:
+            return {"ok": True, "note": "没有待处理的求助"}
+        store.set_meta(f"call_ack:{n['id']}", str(c["ts"]))
+        store.audit(who(u), "确认终端求助", {"desk": store.path_name(area_id), "who": c["who"]})
+        return {"ok": True}
 
     @app.post("/api/desks/{area_id}/command")
     async def desk_command(area_id: int, request: Request, u=Depends(current_user)):

@@ -113,6 +113,12 @@ center:
   node_token: 刚才复制的密钥          # 也可以用环境变量 LABGUARD_NODE_TOKEN
 ```
 
+也可以用脚本一次建好（一张实验桌 + 一台终端 + 一个教师账号，不含任何模拟数据）：
+
+```bash
+python tools/center_init.py --center-url http://总后台的IP:8200 --password 教师密码
+```
+
 重启终端程序后，总览里这张桌会变为在线。总后台断开时终端照常判断和断电，恢复后自动重连。
 
 ### 演示（不需要开发板）
@@ -128,6 +134,16 @@ python tools/center_demo.py --live LG-A01           # 1 号桌留给真实终端
 ```bash
 LAB_SAFETY_CONFIG=runtime/center_demo_live.yaml python run_app.py --mode headless
 ```
+
+### 安全助手接入大模型
+
+安全助手默认线路是「远程 → 本地 → 规则模板」。不配大模型时只能用规则模板（按事件类型给固定建议并引用手册），回答末尾会标明。接通义千问：在开发板上
+
+```bash
+mkdir -p ~/.config/labguard && echo 'DASHSCOPE_API_KEY=你的Key' > ~/.config/labguard/env && chmod 600 ~/.config/labguard/env
+```
+
+开机自启的 `start.sh` 会加载这个文件（Key 不进仓库、不写配置文件）。在电脑上运行时直接 `export DASHSCOPE_API_KEY=...`。也可以在局域网电脑上装 Ollama，把 `config.yaml → agent.local.base_url` 改成那台电脑的地址。
 
 没有摄像头和下位机时，本机控制台「参数」页可播放演示视频，「环境控制 → 演示数据」可注入干烧、烟雾等场景。
 
@@ -162,7 +178,7 @@ arduino-cli upload --fqbn esp32:esp32:esp32s3:FlashSize=8M,PartitionScheme=defau
 cd labguard
 python tests/test_backend.py    # 80 项：安全核心、规则、串口协议（仿真下位机）、控制键
 python tests/test_platform.py   # 44 项：本机控制台接口、安全助手、安全约束检查
-python tests/test_center.py     # 71 项：总后台、混合授权、终端经真实 HTTP 接入、平面图与演示画面
+python tests/test_center.py     # 74 项：总后台、混合授权、终端经真实 HTTP 接入、平面图与演示画面
 ```
 
 都不需要硬件和大模型，测试数据库建在临时目录，不会动 `runtime/`。

@@ -111,6 +111,14 @@ r = node.post("/api/node/report", headers={"X-Node-Token": node_token}, json={"s
 check([c["cmd"] for c in r.json()["commands"]] == ["cut_power"], "终端下次上报取到断电指令")
 r = node.post("/api/node/report", headers={"X-Node-Token": node_token}, json={"snapshot": snap, "meta": {}})
 check(r.json()["commands"] == [], "指令只下发一次")
+import time as _t
+call_snap = dict(snap, call={"ts": _t.time(), "who": "实验员"})
+node.post("/api/node/report", headers={"X-Node-Token": node_token}, json={"snapshot": call_snap, "meta": {}})
+check((zhang.get("/api/overview").json()["desks"][0].get("call") or {}).get("who") == "实验员", "终端「呼叫教师」出现在总览")
+check(li.post(f"/api/desks/{ids['A1']}/call_ack").status_code == 404, "无权教师不能确认求助")
+check(zhang.post(f"/api/desks/{ids['A1']}/call_ack").status_code == 200
+      and zhang.get("/api/overview").json()["desks"][0].get("call") is None, "老师点「已知晓」后求助消失")
+node.post("/api/node/report", headers={"X-Node-Token": node_token}, json={"snapshot": snap, "meta": {}})
 routes = {getattr(rt, "path", "") for rt in app.routes}
 check(not any(k in p for p in routes for k in ("power/on", "power/restore", "unlock", "release")),
       "总后台不存在任何上电 / 解锁接口")

@@ -33,10 +33,13 @@
       return '<div class="stat"' + (last ? ' style="border-right:0"' : '') + '>' + icon(ic, 28) + '<div><div class="mut">' + label + '</div><div class="big">' + val +
         (unit ? '<span style="font-size:16px">' + unit + '</span>' : '') + '</div>' + (sub ? '<div class="mut">' + sub + '</div>' : '') + '</div></div>';
     };
-    return cell('thermo', '热源温度', LG.fmt(t.obj_temp, 1), '℃', esc(eta) + (r.dry_burn_c ? ' · 断电 <span class="num">' + r.dry_burn_c + '℃</span>' : '')) +
-      cell('building', '环境温度', LG.fmt(t.temp, 1), '℃') +
-      cell('drop', '相对湿度', LG.fmt(t.humi, 0), '%') +
-      cell('smoke', '烟雾 MQ-2', t.smoke == null ? '--' : t.smoke, '', r.smoke_raw ? '断电 <span class="num">' + r.smoke_raw + '</span>' : '', true);
+    // 没接控制盒时终端用模拟温湿度维持界面，这里不当实测值显示；演示注入的数据标明来源
+    var sim = t.source === 'simulated' || !t.source, note = sim ? '控制盒未接入' : t.source === 'ipc' ? '演示注入' : '';
+    if (sim) t = {};
+    return cell('thermo', '热源温度', LG.fmt(t.obj_temp, 1), '℃', note || esc(eta) + (r.dry_burn_c ? ' · 断电 <span class="num">' + r.dry_burn_c + '℃</span>' : '')) +
+      cell('building', '环境温度', LG.fmt(t.temp, 1), '℃', note) +
+      cell('drop', '相对湿度', LG.fmt(t.humi, 0), '%', note) +
+      cell('smoke', '烟雾 MQ-2', t.smoke == null ? '--' : t.smoke, '', note || (r.smoke_raw ? '断电 <span class="num">' + r.smoke_raw + '</span>' : ''), true);
   }
 
   function crossHtml(s) {

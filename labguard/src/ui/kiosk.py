@@ -683,6 +683,8 @@ class KioskWindow(QWidget):
 
         def f(x, d, u):
             return "--" if x is None else f"{x:.{d}f}{u}"
+        if t.get("source") == "simulated":      # 没接控制盒：模拟温湿度只用于维持界面，不当实测值显示
+            t = {}
         smoke = t.get("smoke")
         sep = " · " if self.pixel else "\n"     # 像素字体行距紧，沿用旧版单行写法
         self.env_lbl.setText(f"环境 {f(t.get('temp'), 1, '℃')}{sep}湿度 {f(t.get('humi'), 0, '%')}{sep}"
@@ -690,7 +692,8 @@ class KioskWindow(QWidget):
         env = s.get("env") or {}
         if env:
             self.act_lbl.setText(f"排风 {env.get('fan_pwm', 0)}% · 加湿 {'开' if env.get('humid_on') else '关'}"
-                                 f" · {'手动' if env.get('mode') == 'manual' else '自动'}")
+                                 f" · {'手动' if env.get('mode') == 'manual' else '自动'}"
+                                 + ("" if s["link"]["mcu"] else " · 控制盒未接入（仿真）"))
 
     @staticmethod
     def _advice(hist) -> str:
