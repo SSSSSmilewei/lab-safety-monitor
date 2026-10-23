@@ -158,3 +158,17 @@ table.t th { color: var(--dim); font-size: 12px; }
   .title-card h1 { font-size: 18px; }
   .chain .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---- 台面安全区编辑 ---- */
+.zone-card { grid-column: 1 / -1; }
+.zone-wrap { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.zone-stage { position: relative; flex: 3 1 420px; min-width: 0; aspect-ratio: 4 / 3; background: #1A1F3D; border: 2px solid var(--primary); touch-action: none; user-select: none; }
+.zone-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.zone-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.zone-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #C5CAE9; }
+.zone-side { flex: 1 1 220px; display: flex; flex-direction: column; gap: 10px; }
+.zone-legend { display: flex; flex-wrap: wrap; gap: 12px; }
+.zone-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.zone-legend i { display: inline-block; width: 22px; height: 4px; }
+.lg-danger { background: #FF8A00; } .lg-safe { background: #C5CAE9; } .lg-band { height: 10px !important; background: rgba(255, 138, 0, .3); }
+.zone-help { margin: 0; padding-left: 18px; color: var(--dim); line-height: 1.8; }

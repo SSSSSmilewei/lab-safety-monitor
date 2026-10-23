@@ -230,6 +230,14 @@ check(r.status_code == 200 and config_mod.cfg("rules.dry_burn_c") == 130, "合�
 routes = {getattr(rt, "path", "") for rt in client.app.routes}
 check(not any(k in p for p in routes for k in ("power/on", "power/restore", "unlock", "reset", "release")),
       "不存在任何上电 / 解锁接口")
+zone_body = {"points": [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]], "danger": [False, False, True, False], "margin": 0.08}
+r = client.put("/api/desk/zone", headers=H, json=zone_body)
+check(r.status_code == 200 and config_mod.cfg("desk.zone")["danger"] == [False, False, True, False]
+      and config_mod.cfg("desk.edge_margin") == 0.08, "台面安全区保存生效")
+r = client.put("/api/desk/zone", headers=H, json={"points": [[0, 0], [1, 1], [1, 0], [0, 1]]})
+check(r.status_code == 422, "交叉的安全区被拒绝")
+r = client.put("/api/desk/zone", headers=H, json={"points": []})
+check(r.status_code == 200 and config_mod.cfg("desk.zone") is None, "清除安全区 → 回到默认桌边线")
 r = client.post("/api/power/cut", headers=H, json={})
 check(r.status_code == 400, "断电需要显式确认")
 r = client.post("/api/power/cut", headers=H, json={"confirm": True})

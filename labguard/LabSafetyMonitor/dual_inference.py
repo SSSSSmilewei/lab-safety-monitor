@@ -33,6 +33,7 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from src.config import cfg
+from src.core import desk_zone
 from src.core.events import events
 from src.core.telemetry import telemetry
 
@@ -642,13 +643,8 @@ class DualInferenceSystem:
         return out
 
     def _edge_distance(self, px: float, py: float) -> float:
-        """点到桌边线的有向距离（归一化坐标）：正值在台面内侧，负值已越过桌边"""
-        (x1, y1), (x2, y2) = cfg("desk.edge_line", [[0.0, 0.92], [1.0, 0.92]])
-        dx, dy = x2 - x1, y2 - y1
-        length = (dx * dx + dy * dy) ** 0.5 or 1.0
-        d = ((px - x1) * dy - (py - y1) * dx) / length
-        d_center = ((0.5 - x1) * dy - (0.5 - y1) * dx) / length
-        return d if d_center >= 0 else -d
+        """点到危险桌边的有向距离（归一化坐标）：正值在台面内侧，负值已越过桌边。规则见 src/core/desk_zone.py"""
+        return desk_zone.clearance(px, py, cfg("desk.zone", None), cfg("desk.edge_line", desk_zone.DEFAULT_LINE))
 
     def _update_presence(self, now: float, valid: bool, evidence: bool):
         absent_s = float(cfg("presence.absent_seconds", 15.0))
@@ -771,8 +767,17 @@ class DualInferenceSystem:
                 label = f"EDGE {name}" if near else f"{name} {conf:.2f}"
                 cv2.rectangle(ann2, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
                 cv2.putText(ann2, label, (int(x1), max(15, int(y1) - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-            (ex1, ey1), (ex2, ey2) = cfg("desk.edge_line", [[0.0, 0.92], [1.0, 0.92]])
-            cv2.line(ann2, (int(ex1 * w2), int(ey1 * h2)), (int(ex2 * w2), int(ey2 * h2)), (0, 215, 255), 1, cv2.LINE_AA)
+            zone = cfg("desk.zone", None)
+            if zone and zone.get("points"):
+                pts = zone["points"]
+                for i, (ax, ay) in enumerate(pts):
+                    bx, by = pts[(i + 1) % len(pts)]
+                    hot = zone["danger"][i]
+                    cv2.line(ann2, (int(ax * w2), int(ay * h2)), (int(bx * w2), int(by * h2)),
+                             (0, 140, 255) if hot else (160, 160, 160), 3 if hot else 1, cv2.LINE_AA)
+            else:
+                (ex1, ey1), (ex2, ey2) = cfg("desk.edge_line", desk_zone.DEFAULT_LINE)
+                cv2.line(ann2, (int(ex1 * w2), int(ey1 * h2)), (int(ex2 * w2), int(ey2 * h2)), (0, 215, 255), 1, cv2.LINE_AA)
             log_lines.append("[物品模型]: " + (", ".join(f"{d[0]}({d[1]:.2f})" for d in dets) if dets else "未检测到器皿"))
         elif self.enable_chem:
             log_lines.append("[物品模型]: 画面无效，暂停判断")

@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.config import cfg, set_value, resolve_path, PROJECT_ROOT
 from src.core.events import events
+from src.core import desk_zone
 from src.core.tunable import tunable_spec, validate as validate_tunable, label as tunable_label
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -206,6 +207,34 @@ def create_app(engine) -> FastAPI:
                           float(cfg("vision.conf")), float(cfg("vision.iou")), ds.img_size)
         events.log("参数已调整", "，".join(f"{tunable_label(k)}={v}" for k, v in changed.items()), kind="config")
         return {"changed": changed}
+
+    # ---------------- 台面安全区（器皿靠近桌边判定） ----------------
+    @app.get("/api/desk/zone", dependencies=[Depends(auth)])
+    def get_desk_zone():
+        return {"zone": cfg("desk.zone", None), "margin": float(cfg("desk.edge_margin", 0.06)),
+                "line": cfg("desk.edge_line", desk_zone.DEFAULT_LINE)}
+
+    @app.put("/api/desk/zone", dependencies=[Depends(auth)])
+    async def put_desk_zone(request: Request):
+        data = await body(request)
+        try:
+            zone = desk_zone.validate_zone(data)
+        except desk_zone.ZoneError as e:
+            raise HTTPException(422, str(e))
+        margin = data.get("margin")
+        if margin is not None:
+            try:
+                margin = float(margin)
+            except (TypeError, ValueError):
+                raise HTTPException(422, "预警距离必须是数字")
+            if not (0.01 <= margin <= 0.3):
+                raise HTTPException(422, "预警距离需在 0.01–0.3（画面比例）")
+            set_value("desk.edge_margin", round(margin, 3))
+        set_value("desk.zone", zone)
+        events.log("台面安全区已调整",
+                   f"{len(zone['points'])} 个顶点、{sum(zone['danger'])} 条危险边" if zone else "已清除，改用默认桌边线",
+                   kind="config")
+        return get_desk_zone()
 
     @app.post("/api/model", dependencies=[Depends(auth)])
     async def switch_model(request: Request):

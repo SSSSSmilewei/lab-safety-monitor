@@ -25,7 +25,7 @@ DEFAULTS = {
     "presence": {"absent_seconds": 15.0, "recover_seconds": 1.0},
     "voting": {"window_s": 3.0, "on_ratio": 0.6, "off_ratio": 0.2, "min_frames": 4},
     "sleep": {"head_y_ratio": 0.60, "still_seconds": 10.0, "max_motion": 0.03},
-    "desk": {"edge_line": [[0.0, 0.92], [1.0, 0.92]], "edge_margin": 0.06},
+    "desk": {"edge_line": [[0.0, 0.92], [1.0, 0.92]], "edge_margin": 0.06, "zone": None},
     "rules": {
         "heating_on_c": 50.0,
         "dry_burn_c": 120.0,

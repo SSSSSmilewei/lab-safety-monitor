@@ -273,6 +273,7 @@
     api('GET', '/api/media').then(function (m) {
       $('mediaFile').innerHTML = m.files.map(function (f) { return '<option>' + esc(f) + '</option>'; }).join('') || '<option value="">（未找到视频）</option>';
     });
+    zoneLoad();
   }
   $('cfgSave').onclick = function () {
     var data = {};
@@ -293,6 +294,110 @@
   $('srcPause').onclick = function () { cam({ mode: 'pause' }); };
   $('srcVideo').onclick = function () { cam({ mode: 'video', name: $('mediaFile').value }); };
   $('srcUrl').onclick = function () { cam({ mode: 'url', pano: $('urlPano').value || 0, desk: $('urlDesk').value || 0 }); };
+
+  // ---------------- 台面安全区（多边形 + 危险边） ----------------
+  // 坐标为归一化 0–1；SVG 的 viewBox 是 0–1000，preserveAspectRatio=none，与画面拉伸一致
+  var zone = { pts: [], danger: [], margin: 0.06, drag: -1 };
+  var SV = 1000;
+  function zoneSnap() {
+    var img = $('zoneImg');
+    img.onerror = function () { $('zoneEmpty').classList.remove('hidden'); };
+    img.onload = function () { $('zoneEmpty').classList.add('hidden'); };
+    img.src = '/api/frame/desk.jpg?token=' + encodeURIComponent(token) + '&_=' + Date.now();
+  }
+  function zoneLoad() {
+    api('GET', '/api/desk/zone').then(function (z) {
+      zone.margin = z.margin;
+      $('zoneMargin').value = z.margin;
+      if (z.zone && z.zone.points) { zone.pts = z.zone.points.map(function (p) { return [p[0], p[1]]; }); zone.danger = z.zone.danger.slice(); }
+      else {   // 未设安全区：用旧桌边线生成一个矩形，桌边线那条边为危险边
+        var y = Math.max(z.line[0][1], z.line[1][1]);
+        zone.pts = [[0.04, 0.08], [0.96, 0.08], [0.96, y], [0.04, y]]; zone.danger = [false, false, true, false];
+      }
+      $('zoneMsg').textContent = z.zone ? '已加载当前安全区' : '当前未设安全区，使用默认桌边线';
+      zoneDraw();
+    }).catch(function (x) { $('zoneMsg').textContent = x.message; });
+    zoneSnap();
+  }
+  function zoneDraw() {
+    var P = zone.pts, n = P.length, m = Number($('zoneMargin').value) || zone.margin;
+    var poly = P.map(function (p) { return p[0] * SV + ',' + p[1] * SV; }).join(' ');
+    var h = '<defs><clipPath id="zoneClip"><polygon points="' + poly + '"/></clipPath></defs>';
+    h += '<polygon points="' + poly + '" fill="rgba(46,229,157,.10)" stroke="none"/>';
+    for (var i = 0; i < n; i++) {   // 预警带：危险边向内 margin 宽的区域
+      var a = P[i], b = P[(i + 1) % n];
+      if (zone.danger[i]) h += '<line x1="' + a[0] * SV + '" y1="' + a[1] * SV + '" x2="' + b[0] * SV + '" y2="' + b[1] * SV +
+        '" stroke="rgba(255,138,0,.32)" stroke-width="' + (m * SV * 2) + '" clip-path="url(#zoneClip)"/>';
+    }
+    for (i = 0; i < n; i++) {
+      a = P[i]; b = P[(i + 1) % n];
+      var d = zone.danger[i];
+      h += '<line class="z-edge" data-e="' + i + '" x1="' + a[0] * SV + '" y1="' + a[1] * SV + '" x2="' + b[0] * SV + '" y2="' + b[1] * SV +
+        '" stroke="' + (d ? '#FF8A00' : '#C5CAE9') + '" stroke-width="' + (d ? 4 : 2) + '" vector-effect="non-scaling-stroke"' +
+        (d ? '' : ' stroke-dasharray="6 5"') + ' style="cursor:copy"/>';
+      h += '<line data-e="' + i + '" class="z-edge" x1="' + a[0] * SV + '" y1="' + a[1] * SV + '" x2="' + b[0] * SV + '" y2="' + b[1] * SV +
+        '" stroke="transparent" stroke-width="18" vector-effect="non-scaling-stroke" style="cursor:copy"/>';
+      var mx = (a[0] + b[0]) / 2 * SV, my = (a[1] + b[1]) / 2 * SV;
+      h += '<g class="z-mid" data-e="' + i + '" style="cursor:pointer"><title>' + (d ? '危险边（单击改为安全边）' : '安全边（单击改为危险边）') + '</title>' +
+        '<rect x="' + (mx - 11) + '" y="' + (my - 11) + '" width="22" height="22" fill="transparent"/>' +
+        '<rect x="' + (mx - 6) + '" y="' + (my - 6) + '" width="12" height="12" fill="' + (d ? '#FF8A00' : '#FFFFFF') + '" stroke="#1A1F3D" stroke-width="2" vector-effect="non-scaling-stroke"/></g>';
+    }
+    P.forEach(function (p, k) {
+      h += '<circle class="z-pt" data-p="' + k + '" cx="' + p[0] * SV + '" cy="' + p[1] * SV + '" r="9" fill="#FFFFFF" stroke="#1A1F3D" stroke-width="3" vector-effect="non-scaling-stroke" style="cursor:move"><title>拖动调整 · 双击删除</title></circle>';
+    });
+    $('zoneSvg').innerHTML = h;
+  }
+  function zonePos(e) {
+    var r = $('zoneSvg').getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+  }
+  $('zoneSvg').addEventListener('pointerdown', function (e) {
+    var t = e.target.closest('[data-p]');
+    if (t) { zone.drag = Number(t.dataset.p); $('zoneSvg').setPointerCapture(e.pointerId); e.preventDefault(); }
+  });
+  $('zoneSvg').addEventListener('pointermove', function (e) {
+    if (zone.drag < 0) return;
+    zone.pts[zone.drag] = zonePos(e).map(function (v) { return Math.round(v * 1000) / 1000; });
+    zoneDraw();
+  });
+  $('zoneSvg').addEventListener('pointerup', function () { zone.drag = -1; });
+  $('zoneSvg').addEventListener('click', function (e) {
+    var t = e.target.closest('.z-mid');
+    if (!t) return;
+    var i = Number(t.dataset.e);
+    zone.danger[i] = !zone.danger[i];
+    zoneDraw();
+  });
+  $('zoneSvg').addEventListener('dblclick', function (e) {
+    var p = e.target.closest('[data-p]'), ed = e.target.closest('.z-edge');
+    if (p) {
+      if (zone.pts.length <= 3) { $('zoneMsg').textContent = '至少保留 3 个顶点'; return; }
+      var k = Number(p.dataset.p);
+      zone.pts.splice(k, 1);
+      // 删除顶点后，前后两条边合成一条：保留前一条边的危险标记
+      zone.danger.splice(k, 1);
+    } else if (ed) {
+      if (zone.pts.length >= 12) { $('zoneMsg').textContent = '最多 12 个顶点'; return; }
+      var i = Number(ed.dataset.e);
+      zone.pts.splice(i + 1, 0, zonePos(e));
+      zone.danger.splice(i + 1, 0, zone.danger[i]);   // 新顶点把一条边拆成两条，标记沿用原边
+    } else return;
+    zoneDraw();
+  });
+  $('zoneMargin').oninput = zoneDraw;
+  $('zoneRect').onclick = function () {
+    zone.pts = [[0.02, 0.02], [0.98, 0.02], [0.98, 0.98], [0.02, 0.98]]; zone.danger = [false, false, true, false]; zoneDraw();
+  };
+  $('zoneSnap').onclick = zoneSnap;
+  $('zoneSave').onclick = function () {
+    api('PUT', '/api/desk/zone', { points: zone.pts, danger: zone.danger, margin: Number($('zoneMargin').value) })
+      .then(function () { $('zoneMsg').textContent = '已保存，识别即时按新安全区判断'; setTimeout(zoneSnap, 600); })
+      .catch(function (x) { $('zoneMsg').textContent = '保存失败：' + x.message; });
+  };
+  $('zoneClear').onclick = function () {
+    if (!confirm('清除安全区后改用默认桌边线，确定？')) return;
+    api('PUT', '/api/desk/zone', { points: [] }).then(function () { zoneLoad(); }).catch(function (x) { $('zoneMsg').textContent = x.message; });
+  };
 
   // ---------------- Agent ----------------
   function loadAgent() {

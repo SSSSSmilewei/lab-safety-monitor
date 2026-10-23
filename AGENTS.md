@@ -17,7 +17,7 @@
 5. **心跳由安全判断驱动**：`SafetyStateMachine.evaluate()` 每次跑完调用 `SerialComm.feed()`，超过 `serial.engine_stale_s`（5 秒）没被调用就停发心跳，让下位机看门狗接管。不要在别处定时发心跳。
 6. **演示数据不能和真实数据混用**：接上下位机后 `/api/demo/start` 和播放演示视频都返回 409，正在播放的演示视频会自动切回摄像头。
 7. **API Key 只放环境变量**（默认 `DASHSCOPE_API_KEY`），网页上填的 Key 只存在内存里，不写文件、不回显。不要把 Key 写进 `config.yaml` 或提交到仓库。
-8. **界面文案用大白话**，不要写"感知 → 预测 → 研判 → 执行"这类口号，也不要用"研判、闭环、态势、赋能"这类词。界面布局和配色是队长精心设计的，除非被要求，否则不要改。
+8. **界面文案用正式的产品用语**（名词短语，如"授权范围""处置队列""阈值配置"），不写口语化的解释句；但也不要写"感知 → 预测 → 研判 → 执行"这类口号，不用"研判、闭环、态势、赋能"这类词。界面布局和配色是队长精心设计的，除非被要求，否则不要改。（给 AI 助手回答队员问题时仍用大白话。）
 
 ## 3. 仓库结构
 
@@ -44,6 +44,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `src/core/env_control.py` (142) | 排风扇 / 加湿片：`control_law()` 纯函数 + `EnvController` |
 | `src/core/demo.py` (105) | 演示数据注入 `DemoInjector`（场景：normal / heating / dry_burn / smoke / humid / dry_air / hot / custom） |
 | `src/core/jepa_link.py` (48) | 接收电脑端 V-JEPA 2 上报的异常度 |
+| `src/core/desk_zone.py` | 台面安全区：现场框选的多边形 + 危险边，判断器皿是否靠近 / 越过桌边；没框时用旧的单条桌边线 |
 | `src/hardware/sensor_worker.py` (180) | 遥测来源切换：下位机 → 演示数据 IPC 文件 → 自主模拟 |
 | `src/agent/agent.py` (297) | 安全助手 `SafetyAgent`：自动给警告 / 紧急事件写处理建议、问答、实验安全报告；无大模型时用规则模板 `RULE_ADVICE` |
 | `src/agent/llm_client.py` (173) | OpenAI 兼容客户端，线路 `agent.route`：auto（远程→本地）/ remote / local / off；只用标准库 urllib |
@@ -58,7 +59,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
 | `tools/` | `serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（52 项）、`test_platform.py`（41 项）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tests/` | `test_backend.py`（63 项）、`test_platform.py`（44 项）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）。有 `*_rknn_model/` 目录时优先用 NPU |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -91,6 +92,7 @@ ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp, humi, obj_t
 | R8 量器被加热 | 加热中且台面有容量瓶 / 量筒等 | NOTICE |
 | R9 预测干烧 | 越过沸点仍升温且预计 ≤ `predict_eta_warn_s` 90 s 到 120℃；或沸腾 ≥ `boil_unattended_warn_s` 300 s 且无人 | WARNING，**不断电** |
 
+- 器皿靠近桌边（`edge_risk`）：器皿框底边中点离「危险边」小于 `desk.edge_margin`，或已越过危险边。危险边在网页「参数 → 台面安全区」里框选（`desk.zone`），靠墙 / 画面边缘的边标为安全边不报警。
 - 视觉事件（`dual_inference.py`）：`ppe_goggles / ppe_coat / ppe_gloves / ppe_mask / ppe_headmask / eating / sleeping / edge_risk`，经 `voting`（3 秒窗口内 ≥60% 帧命中）确认。
 - 人员在场：PPE 模型检测到任意一类装备即视为有人（模型里没有 person 类）；连续 `presence.absent_seconds` 15 s 无检测才算无人值守。
 - 防抖：器皿识别结果保留 `rules.item_hold_s` 3 s；同类事件解除后 `events.retrigger_s` 10 s 内再出现算同一次。
@@ -128,7 +130,7 @@ ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/
 
 - 除 `/`、`/static/*`、`/font/*`、`/api/ping` 外都要口令：请求头 `X-Token` 或 `?token=`。口令为 `web.token`，留空则自动生成并写入 `runtime/web_token.txt`。
 - 只读：`GET /api/snapshot`、`WS /ws`（2 Hz 推送 snapshot + 最近事件）、`GET /api/events`、`GET /api/events/{uid}/snapshot.jpg`、`GET /stream/{pano|desk}.mjpg`、`GET /api/frame/{pano|desk}.jpg`、`GET /api/config`、`/api/models`、`/api/media`、`/api/agent`、`/api/env`、`/api/demo`。
-- 写：`PATCH /api/config`（仅 `TUNABLE` 白名单 + 范围校验）、`POST /api/model`、`/api/camera`、`/api/power/cut`（需 `{"confirm": true}`，**只能断电**）、`/api/mute`、`/api/events/{uid}/review`、`/api/manual_snapshot`、`/api/agent/config|test|ask|report`、`/api/events/{uid}/agent`、`/api/env/setpoint|manual`、`/api/demo/start|stop`、`/api/jepa/score`。
+- 写：`PATCH /api/config`（仅 `TUNABLE` 白名单 + 范围校验）、`PUT /api/desk/zone`（台面安全区，`{points, danger, margin}`，points 为空则清除）、`POST /api/model`、`/api/camera`、`/api/power/cut`（需 `{"confirm": true}`，**只能断电**）、`/api/mute`、`/api/events/{uid}/review`、`/api/manual_snapshot`、`/api/agent/config|test|ask|report`、`/api/events/{uid}/agent`、`/api/env/setpoint|manual`、`/api/demo/start|stop`、`/api/jepa/score`。
 - 网页 URL 参数：`?token=XXXXXX` 直接登录，`?still=1` 用单张图片轮询代替 MJPEG，`#tab=ov|params|agent|wm|env|review` 打开指定页签。
 
 ## 9. 运行与测试
@@ -138,8 +140,8 @@ cd labguard
 pip install -r requirements.txt          # Python 3.10–3.12
 python run_app.py                          # 电脑大窗口 + 网页 http://127.0.0.1:8080
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
-python tests/test_backend.py               # 52 项，无需硬件
-python tests/test_platform.py              # 41 项，无需硬件和大模型
+python tests/test_backend.py               # 63 项，无需硬件
+python tests/test_platform.py              # 44 项，无需硬件和大模型
 python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 requirements-host.txt）
 ```
 

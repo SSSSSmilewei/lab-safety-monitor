@@ -135,6 +135,29 @@
           <button class="btn" id="srcUrl">连接</button></div>
       </div>
     </div>
+    <div class="card pad zone-card">
+      <div class="sec-t">▌台面安全区<small>器皿靠近危险边即预警 · 保存后即时生效</small></div>
+      <div class="zone-wrap">
+        <div class="zone-stage" id="zoneStage">
+          <img id="zoneImg" alt="台面摄像头画面">
+          <svg id="zoneSvg" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="台面安全区编辑"></svg>
+          <div class="zone-empty hidden" id="zoneEmpty">暂无台面画面</div>
+        </div>
+        <div class="zone-side">
+          <div class="zone-legend"><span><i class="lg-danger"></i>危险边</span><span><i class="lg-safe"></i>安全边</span><span><i class="lg-band"></i>预警带</span></div>
+          <ul class="zone-help">
+            <li>拖动顶点：调整位置</li>
+            <li>单击边中点：切换危险边 / 安全边</li>
+            <li>双击边：插入顶点</li>
+            <li>双击顶点：删除顶点</li>
+          </ul>
+          <label class="f">预警距离（画面比例 0.01–0.3）<input type="number" id="zoneMargin" step="0.01" min="0.01" max="0.3"></label>
+          <div class="row"><button class="btn" id="zoneRect">铺满矩形</button><button class="btn" id="zoneSnap">刷新画面</button></div>
+          <div class="row"><button class="btn ok" id="zoneSave">保存安全区</button><button class="btn" id="zoneClear">清除</button></div>
+          <div class="muted" id="zoneMsg"></div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ================= Agent ================= -->

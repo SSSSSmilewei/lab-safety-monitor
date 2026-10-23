@@ -341,6 +341,29 @@ sysd.chem_model.boxes = [Box(0, 0.9, (300, 100, 360, 200))]
 r = step(14)
 check(not r[2]["falling_warning"] and r[2]["chem_items"] == ["Beaker"], "器皿在台面内侧 → 无风险")
 
+# 台面安全区：自己框的多边形 + 危险边（只有危险边附近才算靠近桌边）
+from src.core import desk_zone as dz
+Z = dz.validate_zone({"points": [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]], "danger": [False, False, True, False]})
+check(dz.zone_clearance(0.5, 0.5, Z) > 0.3, "安全区中央离危险边很远")
+check(0 < dz.zone_clearance(0.5, 0.86, Z) < 0.06, "靠近危险边（下边）→ 进入预警带")
+check(dz.zone_clearance(0.5, 0.95, Z) < 0, "越过危险边 → 负距离")
+check(dz.zone_clearance(0.95, 0.5, Z) == dz.FAR and dz.zone_clearance(0.12, 0.5, Z) > 0.3, "靠近 / 越过安全边不预警")
+for bad, why in (({"points": [[0, 0], [1, 1], [1, 0], [0, 1]]}, "边交叉"), ({"points": [[0, 0], [0.05, 0], [0, 0.05]]}, "面积过小"),
+                 ({"points": [[0, 0], [1, 0], [1, 1]], "danger": [False] * 3}, "没有危险边"), ({"points": [[0, 0], [2, 0], [1, 1]]}, "超出画面")):
+    try:
+        dz.validate_zone(bad); check(False, "安全区校验：" + why)
+    except dz.ZoneError:
+        check(True, "安全区校验拒绝：" + why)
+check(dz.validate_zone({"points": []}) is None, "空顶点 = 清除安全区")
+_cfg["desk"]["zone"] = Z
+sysd.chem_model.boxes = [Box(0, 0.9, (300, 300, 360, 412))]       # 底部 0.858 → 靠近下边（危险边）
+r = step(10)
+check(r[2]["falling_warning"], "安全区：器皿靠近危险边 → 坠落风险")
+sysd.chem_model.boxes = [Box(0, 0.9, (590, 200, 630, 300))]       # 越过右边（安全边）
+r = step(14)
+check(not r[2]["falling_warning"], "安全区：越过安全边（靠墙一侧）不报警")
+_cfg["desk"]["zone"] = None
+
 sysd.ppe_model.boxes = [Box(5, 0.9, (100, 200, 300, 470)), Box(6, 0.8, (180, 380, 230, 420))]
 r = step(14)
 check(r[2]["sleeping"], "面部装备持续偏低且静止 → 疑似伏案")
