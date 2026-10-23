@@ -2,7 +2,8 @@
 (function () {
   'use strict';
   var LG = window.LG, esc = LG.esc, icon = LG.icon;
-  var st = { room: null, riskOnly: false };
+  var st = { room: null, riskOnly: false, mode: 'list' };
+  try { st.mode = localStorage.getItem('lg.ov.mode') === 'map' ? 'map' : 'list'; } catch (e) { /* 浏览器禁用存储时用默认 */ }
 
   function riskOrder(lv) { return { high: 0, mid: 1, low: 2, off: 3, none: 4 }[lv]; }
 
@@ -89,6 +90,66 @@
     return html || '<div class="empty">' + (LG.S.tree.length ? '当前筛选下无实验桌' : '尚未建立区域' + (LG.isAdmin() ? '，请在「区域」页添加实验室与实验桌' : '')) + '</div>';
   }
 
+  // ---------------- 平面图 ----------------
+  // 楼层 = 直接包含「房间」的区域；房间、实验桌的位置来自区域的 layout（上级的百分比），没设置时自动排布
+  function autoRooms(n) {          // 房间沿走廊两侧排布：上排 4–44%，走廊 46–54%，下排 56–96%
+    var top = Math.ceil(n / 2), out = [];
+    for (var i = 0; i < n; i++) {
+      var row = i < top ? 0 : 1, k = row ? i - top : i, cnt = row ? n - top : top;
+      var w = (96 - 2 * (cnt - 1)) / cnt;
+      out.push({ x: 2 + k * (w + 2), y: row ? 56 : 4, w: w, h: 40 });
+    }
+    return out;
+  }
+  function autoDesks(n) {          // 与 tools/center_demo.py 的 desk_boxes() 相同：两列，留出过道
+    var cols = n === 1 ? 1 : 2, rows = Math.max(1, Math.ceil(n / cols)), out = [];
+    var w = (84 - 8 * (cols - 1)) / cols, h = (76 - 8 * (rows - 1)) / rows;
+    for (var i = 0; i < n; i++) out.push({ x: 8 + (i % cols) * (w + 8), y: 16 + Math.floor(i / cols) * (h + 8), w: w, h: h });
+    return out;
+  }
+  function box(b) { return 'left:' + b.x + '%;top:' + b.y + '%;width:' + b.w + '%;height:' + b.h + '%'; }
+
+  function mapHtml(ov) {
+    var byArea = {};
+    ov.desks.forEach(function (d) { byArea[d.area_id] = d; });
+    var rooms = LG.S.tree.filter(function (a) { return a.kind === 'room'; });
+    var floors = [];
+    rooms.forEach(function (r) { if (floors.indexOf(r.parent_id) < 0) floors.push(r.parent_id); });
+    if (st.room != null) {
+      var sel = LG.areaById(Number(st.room));
+      floors = floors.filter(function (f) { return sel && (sel.parent_id === f || sel.id === f); });
+    }
+    if (!floors.length) return '<div class="empty">' + (rooms.length ? '当前筛选下无平面图' : '尚未建立房间' + (LG.isAdmin() ? '，请在「区域」页添加' : '')) + '</div>';
+    return '<div class="plans">' + floors.map(function (fid) {
+      var rs = rooms.filter(function (r) { return r.parent_id === fid; });
+      var auto = autoRooms(rs.length);
+      var cells = rs.map(function (r, i) {
+        var ds = LG.children(r.id).filter(function (a) { return a.kind === 'desk' && a.managed; });
+        var dauto = autoDesks(ds.length);
+        var lvs = ds.map(function (a) { return LG.deskLevel(byArea[a.id]); });
+        var worst = lvs.reduce(function (w, lv) { return riskOrder(lv) < riskOrder(w) ? lv : w; }, 'none');
+        var on = st.room != null && String(st.room) === String(r.id);
+        var tiles = ds.map(function (a, j) {
+          var d = byArea[a.id], lv = lvs[j], L = LG.LV[lv];
+          var dim = st.riskOnly && lv !== 'high' && lv !== 'mid';
+          var tip = LG.pathOf(a.id) + ' · ' + (!d ? '未绑定终端' : !d.online ? '终端离线' : (d.latched ? '断电锁定' : L.text + (d.scene ? ' · ' + d.scene : '')));
+          return '<a class="pdesk lv-' + lv + (dim ? ' dim' : '') + '" href="#/desk/' + a.id + '" style="' + box(a.layout || dauto[j]) + '" title="' + esc(tip) + '">' +
+            '<span class="pn">' + esc(a.name.replace(/号桌$/, '')) + '</span>' +
+            '<span class="pv num">' + (d && d.latched ? icon('lock', 14) : d && d.online && d.obj_temp != null ? Math.round(d.obj_temp) + '℃' : (d && d.online ? '' : L.text)) + '</span>' +
+            '<span class="sr">' + esc(tip) + '</span></a>';
+        }).join('');
+        return '<div class="proom' + (on ? ' on' : '') + (ds.length ? '' : ' empty-room') + '" style="' + box(r.layout || auto[i]) + '">' +
+          '<div class="prh"><span class="hd">' + esc(r.name) + '</span>' + (ds.length ? '<i class="dot" aria-hidden="true" style="background:' + LG.LV[worst].color + '"></i>' : '') +
+          '</div><div class="prin">' + tiles + '</div></div>';
+      }).join('');
+      return '<div class="pfloor"><div class="roomhd">' + icon('plan', 16) + '<span class="hd">' + esc(fid != null && LG.areaById(fid) ? LG.pathOf(fid) : '未分组') + '</span><span class="grow"></span>' +
+        '<span class="mut">' + rs.length + ' 间</span></div>' +
+        '<div class="planwrap"><div class="plan"><div class="corr" aria-hidden="true"><span>走廊</span></div>' + cells + '</div></div></div>';
+    }).join('') + '</div><div class="row plegend">' + ['high', 'mid', 'low', 'off', 'none'].map(function (lv) {
+      return '<span class="pkey lv-' + lv + '"></span><span>' + LG.LV[lv].text + '</span>';
+    }).join('') + '<span class="grow"></span><span class="mut">示意布局 · 点击实验桌查看画面</span></div>';
+  }
+
   LG.cutPower = function (areaId, path) {
     return LG.confirm('切断加热电源', '<div><b>' + esc(path) + '</b></div><div>终端下次上报时（约 2 秒内）执行断电。</div>' +
       '<div class="mut">' + icon('lock', 16) + ' 软件与远程均不可恢复供电，复电须现场长按控制盒复位键。</div>', '确认断电', true).then(function (ok) {
@@ -105,6 +166,7 @@
         '<div class="cols"><section class="panel" aria-label="处置队列" style="flex:3 1 520px"><div class="ph">' + icon('alert') + '处置队列<span class="sp"></span><small>按风险等级排序</small></div><div id="ovQueue"></div></section>' +
         '<section class="panel" aria-label="区域筛选" style="flex:1 1 240px"><div class="ph">' + icon('building') + '区域筛选</div><div id="ovRooms"></div></section></div>' +
         '<section class="panel" aria-label="实验桌状态"><div class="ph">' + icon('desk') + '实验桌状态<span class="sp"></span>' +
+        '<span class="seg"><button class="btn" data-m="list" aria-label="列表">' + icon('list', 16) + '列表</button><button class="btn" data-m="map" aria-label="平面图">' + icon('plan', 16) + '平面图</button></span>' +
         '<span class="seg"><button class="btn" data-f="all">全部</button><button class="btn" data-f="risk">中高危</button></span></div><div id="ovDesks"></div></section>';
       var last = null;
       function paint() {
@@ -113,13 +175,19 @@
         LG.$('#ovStats').innerHTML = statsHtml(last.summary);
         LG.$('#ovQueue').innerHTML = queueHtml(last);
         LG.$('#ovRooms').innerHTML = roomsHtml(gs, gs.reduce(function (n, g) { return n + g.desks.length; }, 0));
-        LG.$('#ovDesks').innerHTML = desksHtml(gs);
+        var box = LG.$('#ovDesks'), sx = LG.$$('.planwrap', box).map(function (w) { return w.scrollLeft; });
+        box.innerHTML = st.mode === 'map' ? mapHtml(last) : desksHtml(gs);
+        LG.$$('.planwrap', box).forEach(function (w, i) { w.scrollLeft = sx[i] || 0; });   // 窄屏横向滚动位置在刷新后保留
         LG.$$('[data-f]', main).forEach(function (b) { b.classList.toggle('on', (b.dataset.f === 'risk') === st.riskOnly); });
+        LG.$$('[data-m]', main).forEach(function (b) { b.classList.toggle('on', b.dataset.m === st.mode); });
       }
       main.addEventListener('click', function (e) {
-        var t = e.target.closest('[data-room], [data-f], [data-cut]');
+        var t = e.target.closest('[data-room], [data-f], [data-m], [data-cut]');
         if (!t) return;
-        if (t.hasAttribute('data-room')) st.room = t.dataset.room === '' ? null : t.dataset.room;
+        if (t.dataset.m) {
+          st.mode = t.dataset.m;
+          try { localStorage.setItem('lg.ov.mode', st.mode); } catch (x) { /* 忽略 */ }
+        } else if (t.hasAttribute('data-room')) st.room = t.dataset.room === '' ? null : t.dataset.room;
         else if (t.dataset.f) st.riskOnly = t.dataset.f === 'risk';
         else if (t.dataset.cut) { LG.cutPower(t.dataset.cut, t.dataset.path); return; }
         paint();

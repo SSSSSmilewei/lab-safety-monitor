@@ -11,6 +11,7 @@ center/store.py
   profiles   区域的规则阈值（主控决策）：下级覆盖上级，下发给节点前在节点本地再校验一次
   commands   发给节点的指令队列：只有 cut_power / mute 两种，没有任何上电指令
   voice_*    语音素材与「事件 × 语气」映射
+  demo_frames 演示画面：每张实验桌的全景 / 台面各一张图片，终端无法提供实时画面时显示（标明「演示画面」）
   audit      操作记录
 """
 import hashlib
@@ -62,6 +63,9 @@ CREATE TABLE IF NOT EXISTS voice_map (
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY, ts REAL NOT NULL, user TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS demo_frames (
+  area_id INTEGER NOT NULL, which TEXT NOT NULL, mime TEXT NOT NULL, data BLOB NOT NULL,
+  updated REAL NOT NULL, updated_by TEXT NOT NULL DEFAULT '', PRIMARY KEY (area_id, which));
 """
 
 
@@ -91,6 +95,8 @@ class Store:
             cols = {r[1] for r in self._db.execute("PRAGMA table_info(users)")}
             if "ui_style" not in cols:     # 旧数据库升级
                 self._db.execute("ALTER TABLE users ADD COLUMN ui_style TEXT NOT NULL DEFAULT 'standard'")
+            if "layout" not in {r[1] for r in self._db.execute("PRAGMA table_info(areas)")}:
+                self._db.execute("ALTER TABLE areas ADD COLUMN layout TEXT NOT NULL DEFAULT ''")
             self._db.commit()
 
     # ------------------------------------------------------------------
@@ -247,12 +253,21 @@ class Store:
     # ------------------------------------------------------------------
     # 区域树
     # ------------------------------------------------------------------
+    @staticmethod
+    def _area_dict(r: sqlite3.Row) -> Dict[str, Any]:
+        a = dict(r)
+        try:
+            a["layout"] = json.loads(a.get("layout") or "null")
+        except ValueError:
+            a["layout"] = None
+        return a
+
     def areas(self) -> List[Dict[str, Any]]:
-        return [dict(r) for r in self._q("SELECT * FROM areas ORDER BY sort, id")]
+        return [self._area_dict(r) for r in self._q("SELECT * FROM areas ORDER BY sort, id")]
 
     def area(self, area_id: int) -> Optional[Dict[str, Any]]:
         r = self._q("SELECT * FROM areas WHERE id=?", (area_id,))
-        return dict(r[0]) if r else None
+        return self._area_dict(r[0]) if r else None
 
     def create_area(self, name: str, parent_id: Optional[int], kind: str = "group", note: str = "") -> int:
         name = (name or "").strip()
@@ -273,7 +288,7 @@ class Store:
                        (parent_id, name, kind, sort, (note or "")[:200], time.time()))
 
     def update_area(self, area_id: int, name: Optional[str] = None, parent_id: Any = "keep",
-                    note: Optional[str] = None):
+                    note: Optional[str] = None, layout: Any = "keep"):
         a = self.area(area_id)
         if a is None:
             raise StoreError("区域不存在")
@@ -292,6 +307,22 @@ class Store:
             self._x("UPDATE areas SET parent_id=? WHERE id=?", (parent_id, area_id))
         if note is not None:
             self._x("UPDATE areas SET note=? WHERE id=?", (note[:200], area_id))
+        if layout != "keep":
+            self.set_layout(area_id, layout)
+
+    def set_layout(self, area_id: int, layout: Optional[Dict[str, Any]]):
+        """区域在上级平面图里的位置：{x, y, w, h}，单位是上级宽 / 高的百分比；None = 自动排布"""
+        if layout is None:
+            self._x("UPDATE areas SET layout='' WHERE id=?", (area_id,))
+            return
+        try:
+            box = {k: round(float(layout[k]), 2) for k in ("x", "y", "w", "h")}
+        except (KeyError, TypeError, ValueError):
+            raise StoreError("位置需要 x、y、w、h 四个数")
+        if not (0 <= box["x"] < 100 and 0 <= box["y"] < 100 and 1 <= box["w"] <= 100 and 1 <= box["h"] <= 100
+                and box["x"] + box["w"] <= 100.01 and box["y"] + box["h"] <= 100.01):
+            raise StoreError("位置超出上级范围（0–100%）")
+        self._x("UPDATE areas SET layout=? WHERE id=?", (json.dumps(box), area_id))
 
     def delete_area(self, area_id: int):
         if self._q("SELECT 1 FROM areas WHERE parent_id=?", (area_id,)):
@@ -301,6 +332,7 @@ class Store:
         self._x("DELETE FROM grants WHERE area_id=?", (area_id,))
         self._x("DELETE FROM profiles WHERE area_id=?", (area_id,))
         self._x("DELETE FROM voice_map WHERE area_id=?", (area_id,))
+        self._x("DELETE FROM demo_frames WHERE area_id=?", (area_id,))
         self._x("DELETE FROM areas WHERE id=?", (area_id,))
 
     def _children_map(self) -> Dict[Optional[int], List[int]]:
@@ -506,6 +538,29 @@ class Store:
     def commands_of(self, node_id: int, n: int = 20) -> List[Dict[str, Any]]:
         return [dict(r) for r in self._q("SELECT * FROM commands WHERE node_id=? ORDER BY id DESC LIMIT ?",
                                          (node_id, n))]
+
+    # ------------------------------------------------------------------
+    # 演示画面
+    # ------------------------------------------------------------------
+    def set_demo_frame(self, area_id: int, which: str, mime: str, data: bytes, by: str):
+        self._x("INSERT INTO demo_frames (area_id, which, mime, data, updated, updated_by) VALUES (?,?,?,?,?,?) "
+                "ON CONFLICT(area_id, which) DO UPDATE SET mime=excluded.mime, data=excluded.data, "
+                "updated=excluded.updated, updated_by=excluded.updated_by",
+                (area_id, which, mime, sqlite3.Binary(data), time.time(), by))
+
+    def demo_frame(self, area_id: int, which: str) -> Optional[Dict[str, Any]]:
+        r = self._q("SELECT * FROM demo_frames WHERE area_id=? AND which=?", (area_id, which))
+        return dict(r[0]) if r else None
+
+    def demo_frame_info(self) -> Dict[int, Dict[str, float]]:
+        """{area_id: {which: 更新时间}}，不带图片内容"""
+        out: Dict[int, Dict[str, float]] = {}
+        for r in self._q("SELECT area_id, which, updated FROM demo_frames"):
+            out.setdefault(r["area_id"], {})[r["which"]] = r["updated"]
+        return out
+
+    def delete_demo_frame(self, area_id: int, which: str):
+        self._x("DELETE FROM demo_frames WHERE area_id=? AND which=?", (area_id, which))
 
     # ------------------------------------------------------------------
     # 语音素材

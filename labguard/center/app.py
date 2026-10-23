@@ -38,6 +38,8 @@ ZPIX_PATH = os.path.join(ROOT, "LabSafetyMonitor", "Zpix.ttf")
 COOKIE = "lg_session"
 ONLINE_S = 10.0              # 超过这么久没上报视为离线
 LOCK_FAILS, LOCK_S = 5, 300
+DEMO_MIMES = {"image/jpeg": b"\xff\xd8", "image/png": b"\x89PNG", "image/webp": b"RIFF"}
+DEMO_MAX_BYTES = 3 * 1024 * 1024
 
 # 可按区域配置的问答参数（节点上由 SafetyAgent.configure 再校验一次）
 AGENT_KEYS = {
@@ -266,10 +268,12 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
     @app.get("/api/tree")
     def tree(u=Depends(current_user)):
         nodes = {n["area_id"]: n for n in store.nodes() if n["area_id"] is not None}
+        demo = store.demo_frame_info()
         out = []
         for a in store.visible_tree(u):
             n = nodes.get(a["id"]) if a["managed"] else None
             a["node"] = _node_brief(n) if n else None
+            a["demo"] = sorted(demo.get(a["id"], {})) if a["managed"] else []
             out.append(a)
         return out
 
@@ -312,7 +316,7 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
         data = await body(request)
         try:
             store.update_area(aid, data.get("name"), data["parent_id"] if "parent_id" in data else "keep",
-                              data.get("note"))
+                              data.get("note"), data["layout"] if "layout" in data else "keep")
         except StoreError as e:
             bad(e)
         store.audit(who(u), "修改区域", {"id": aid, **data})
@@ -470,7 +474,8 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
                                       "smoke_limit_raw", "applied_profile")}
         meta["online"] = _online(n)
         return {"area": store.area(area_id), "path": store.path_name(area_id), "node": meta,
-                "snapshot": n.get("snapshot") or {}, "commands": store.commands_of(n["id"], 10)}
+                "snapshot": n.get("snapshot") or {}, "commands": store.commands_of(n["id"], 10),
+                "demo": sorted(store.demo_frame_info().get(area_id, {}))}
 
     def _node_http(n: Dict[str, Any], path: str, payload: Optional[dict] = None, timeout: float = 30.0) -> bytes:
         """总后台 → 终端网页（同一局域网）：只调用终端开放给节点密钥的只读 / 问答接口"""
@@ -492,9 +497,44 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
     async def desk_frame(area_id: int, which: str, u=Depends(current_user)):
         if which not in ("pano", "desk"):
             raise HTTPException(404)
-        n = _desk_node(u, area_id)
-        data = await asyncio.to_thread(_node_http, n, f"/api/frame/{which}.jpg", None, 5.0)
-        return Response(data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+        need_area(u, area_id)
+        n = store.node_by_area(area_id)
+        err: Optional[HTTPException] = None
+        if n is not None and _online(n):
+            try:
+                data = await asyncio.to_thread(_node_http, n, f"/api/frame/{which}.jpg", None, 5.0)
+                return Response(data, media_type="image/jpeg",
+                                headers={"Cache-Control": "no-store", "X-Frame-Source": "live"})
+            except HTTPException as e:
+                err = e
+        demo = store.demo_frame(area_id, which)    # 终端拿不到实时画面时用演示画面，前端标明「演示画面」
+        if demo is not None:
+            return Response(bytes(demo["data"]), media_type=demo["mime"],
+                            headers={"Cache-Control": "no-store", "X-Frame-Source": "demo"})
+        raise err or HTTPException(503, "终端离线" if n is not None else "这张实验桌还没有绑定终端")
+
+    @app.put("/api/desks/{area_id}/demo/{which}")
+    async def put_demo_frame(area_id: int, which: str, request: Request, u=Depends(admin_user)):
+        a = store.area(area_id)
+        if which not in ("pano", "desk") or a is None or a["kind"] != "desk":
+            raise HTTPException(404)
+        mime = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+        if mime not in DEMO_MIMES:
+            raise HTTPException(422, "只支持 JPEG / PNG / WebP 图片")
+        data = await request.body()
+        if not data or len(data) > DEMO_MAX_BYTES:
+            raise HTTPException(422, f"图片需小于 {DEMO_MAX_BYTES // 1024 // 1024} MB")
+        if not data.startswith(DEMO_MIMES[mime]) and not (mime == "image/webp" and data[8:12] == b"WEBP"):
+            raise HTTPException(422, "文件内容与图片格式不符")
+        store.set_demo_frame(area_id, which, mime, data, who(u))
+        store.audit(who(u), "设置演示画面", {"desk": store.path_name(area_id), "which": which})
+        return {"ok": True}
+
+    @app.delete("/api/desks/{area_id}/demo/{which}")
+    def delete_demo_frame(area_id: int, which: str, u=Depends(admin_user)):
+        store.delete_demo_frame(area_id, which)
+        store.audit(who(u), "清除演示画面", {"desk": store.path_name(area_id), "which": which})
+        return {"ok": True}
 
     @app.post("/api/desks/{area_id}/ask")
     async def desk_ask(area_id: int, request: Request, u=Depends(current_user)):

@@ -129,6 +129,37 @@ table.tb tr.bad td { background: var(--high-bg); }
 .deskcard.off { border-style: dashed; background: var(--soft2); }
 .deskcard.high { background: var(--high-bg); }
 
+/* ---------- 平面图（示意布局：楼层 → 房间 → 实验桌，位置为上级的百分比） ---------- */
+.plans { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(560px, 100%), 1fr)); gap: 12px; padding: 12px; border-bottom: 3px solid var(--ink); }
+.pfloor { border: 2px solid var(--ink); min-width: 0; }
+.pfloor .roomhd svg { flex: 0 0 auto; }
+.planwrap { overflow-x: auto; }
+.plan { position: relative; min-width: 520px; aspect-ratio: 100 / 56; margin: 10px; border: 2px solid var(--ink); background-color: var(--soft2);
+  background-image: linear-gradient(var(--line-soft) 1px, transparent 1px), linear-gradient(90deg, var(--line-soft) 1px, transparent 1px); background-size: 24px 24px; }
+.corr { position: absolute; left: 0; right: 0; top: 46%; height: 8%; display: flex; align-items: center; justify-content: center;
+  border-top: 2px dashed var(--mute-line); border-bottom: 2px dashed var(--mute-line); color: var(--dim); font-size: 12px; letter-spacing: 12px; }
+.proom { position: absolute; display: flex; flex-direction: column; background: #fff; border: 2px solid var(--ink); }
+.proom.on { box-shadow: 0 0 0 3px var(--primary); z-index: 1; }
+.proom.empty-room { background: repeating-linear-gradient(135deg, #fff 0 8px, var(--soft2) 8px 16px); }
+.prh { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; background: var(--soft); border-bottom: 2px solid var(--ink); }
+.prh .hd { font-size: 14px; line-height: 1.1; }
+.prh .dot { width: 10px; height: 10px; border: 2px solid var(--ink); }
+.prin { position: relative; flex: 1 1 auto; }
+.pdesk { position: absolute; display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 0 6px; overflow: hidden;
+  border: 2px solid var(--ink); color: var(--ink); text-decoration: none; font-weight: 600; }
+.pdesk:hover { box-shadow: 3px 3px 0 var(--ink); z-index: 2; color: inherit; }
+.pdesk:focus-visible { outline: 3px solid var(--mid); outline-offset: 2px; z-index: 2; }
+.pdesk .pn { font-family: var(--f-hd); font-size: 17px; line-height: 1.1; }
+.pdesk .pv { font-size: 12px; line-height: 1.1; display: inline-flex; }
+.pdesk.dim { opacity: .35; }
+.pdesk.lv-high, .pkey.lv-high { background: var(--high); color: #fff; }
+.pdesk.lv-mid, .pkey.lv-mid { background: var(--mid); }
+.pdesk.lv-low, .pkey.lv-low { background: var(--low-bg); color: var(--low-deep); }
+.pdesk.lv-off, .pdesk.lv-none, .pkey.lv-off, .pkey.lv-none { background: var(--soft2); color: var(--dim); border-style: dashed; }
+.plegend { border-bottom: 0; gap: 6px 8px; }
+.pkey { display: inline-block; width: 18px; height: 14px; border: 2px solid var(--ink); }
+.cam .demo-tag { position: absolute; left: 8px; top: 8px; }
+
 /* ---------- 实验桌 ---------- */
 .cams { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 16px; }
 .cam { margin: 0; }
@@ -200,6 +231,7 @@ table.tb tr.bad td { background: var(--high-bg); }
   .brand { border-right: 0; flex: 1 1 100%; }
   .stat { border-right: 0; border-bottom: 3px solid var(--ink); }
   .finals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ph { flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; white-space: nowrap; }
 }
 
 /* ---------- 像素风格（旧版 Zpix，按账号开启） ---------- */

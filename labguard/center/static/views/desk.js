@@ -18,8 +18,12 @@
   }
 
   function camHtml(which, title, ic) {
-    return '<figure class="panel cam"><figcaption class="ph">' + icon(ic) + title + '<span class="sp"></span><small class="num" id="fps-' + which + '"></small></figcaption>' +
-      '<div class="view"><img id="img-' + which + '" alt="' + title + '画面" hidden><span id="noimg-' + which + '">画面加载中…</span></div></figure>';
+    var admin = LG.isAdmin() ? '<label class="btn sm flat" title="上传演示画面">' + icon('upload', 14) + '<span class="sr">上传演示画面</span>' +
+      '<input type="file" accept="image/jpeg,image/png,image/webp" data-up="' + which + '" hidden></label>' +
+      '<button class="btn sm flat" data-clr="' + which + '" title="清除演示画面" hidden>' + icon('trash', 14) + '<span class="sr">清除演示画面</span></button>' : '';
+    return '<figure class="panel cam"><figcaption class="ph">' + icon(ic) + title + '<span class="sp"></span><small class="num" id="fps-' + which + '"></small>' + admin + '</figcaption>' +
+      '<div class="view"><img id="img-' + which + '" alt="' + title + '画面" hidden><span id="noimg-' + which + '">画面加载中…</span>' +
+      '<span class="tag t-mid demo-tag" id="src-' + which + '" hidden>演示画面</span></div></figure>';
   }
 
   function sensorsHtml(s) {
@@ -117,7 +121,7 @@
         '<div class="row mut foot" style="font-size:12px">' + icon('lock', 16) + '仅支持断电 · 复电须现场复位</div></section>' +
         '<section class="panel" aria-label="事件记录"><div class="ph">' + icon('clock') + '事件记录</div><div id="dkEvents"></div></section></div></div>';
 
-      var online = false, snap = null;
+      var online = false, snap = null, demo = {}, nudge = {};
       function paintChat() { var c = LG.$('#dkChat'); c.innerHTML = chatHtml(id); c.scrollTop = c.scrollHeight; }
       paintChat();
 
@@ -147,13 +151,41 @@
         }).catch(LG.fail);
       };
 
-      // 画面：上一张加载完再取下一张，离线时停止
+      // 画面：上一张加载完再取下一张；终端拿不到实时画面时由总后台返回演示画面（X-Frame-Source: demo）
       ['pano', 'desk'].forEach(function (w) {
-        var img = LG.$('#img-' + w), no = LG.$('#noimg-' + w);
-        function next(delay) { LG.later(delay, function () { if (online) img.src = '/api/desks/' + id + '/frame/' + w + '.jpg?_=' + Date.now(); else next(2000); }); }
-        img.onload = function () { img.hidden = false; no.hidden = true; next(1000); };
-        img.onerror = function () { img.hidden = true; no.hidden = false; no.textContent = '画面不可用'; next(5000); };
+        var img = LG.$('#img-' + w), no = LG.$('#noimg-' + w), tag = LG.$('#src-' + w), url = null;
+        function next(delay) { if (document.body.contains(img)) LG.later(delay, load); }
+        function show(msg) { img.hidden = true; tag.hidden = true; no.hidden = false; no.textContent = msg; }
+        function load() {
+          if (!online && !demo[w]) { show(LG.isAdmin() ? '无画面 · 可上传演示画面' : '无画面'); next(2000); return; }
+          var src = 'live';
+          fetch('/api/desks/' + id + '/frame/' + w + '.jpg?_=' + Date.now(), { credentials: 'same-origin', cache: 'no-store' }).then(function (r) {
+            if (!r.ok) throw new Error(r.status);
+            src = r.headers.get('X-Frame-Source') || 'live';
+            return r.blob();
+          }).then(function (b) {
+            if (url) URL.revokeObjectURL(url);
+            url = URL.createObjectURL(b); img.src = url;
+            img.hidden = false; no.hidden = true; tag.hidden = src !== 'demo';
+            next(src === 'demo' ? 5000 : 1000);
+          }).catch(function () { show('画面不可用'); next(5000); });
+        }
+        nudge[w] = load;
         next(300);
+      });
+      main.addEventListener('change', function (e) {
+        var w = e.target.dataset.up, f = e.target.files && e.target.files[0];
+        if (!w || !f) return;
+        e.target.value = '';
+        fetch('/api/desks/' + id + '/demo/' + w, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': f.type }, body: f }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : '上传失败（' + r.status + '）'); });
+        }).then(function () { demo[w] = true; LG.toast('演示画面已更新'); nudge[w](); }).catch(LG.fail);
+      });
+      main.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-clr]');
+        if (!b) return;
+        var w = b.dataset.clr;
+        LG.api('DELETE', '/api/desks/' + id + '/demo/' + w).then(function () { demo[w] = false; LG.toast('演示画面已清除'); nudge[w](); }).catch(LG.fail);
       });
 
       var dead = false;     // 实验桌未绑定终端：停止轮询
@@ -162,6 +194,8 @@
         LG.api('GET', '/api/desks/' + id).then(function (d) {
           var n = d.node, s = d.snapshot || {};
           online = n.online; snap = s;
+          demo = {}; (d.demo || []).forEach(function (w) { demo[w] = true; });
+          LG.$$('[data-clr]', main).forEach(function (b) { b.hidden = !demo[b.dataset.clr]; });
           var lv = n.online ? (s.latched ? 'high' : (s.risk || {}).level || 'low') : 'off', L = LG.LV[lv];
           LG.$('#dkHead').innerHTML =
             '<div style="display:flex;align-items:center;gap:12px;padding:8px 16px;border-right:3px solid var(--ink);flex:1 1 260px;flex-wrap:wrap">' +

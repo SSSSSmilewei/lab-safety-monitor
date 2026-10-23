@@ -46,6 +46,14 @@
           '<div class="row foot"><button class="btn pri" id="eSave">' + icon('check') + '保存</button>' +
           '<button class="btn dng" id="eDel"' + (kids.length || node ? ' disabled title="请先删除下级区域或解绑终端"' : '') + '>' + icon('trash') + '删除</button>' +
           '<span class="mut">下级 <span class="num">' + kids.length + '</span> 个</span></div></section>';
+        if (a.kind === 'room' || a.kind === 'desk') {
+          var L = a.layout || {};
+          html += '<section class="panel"><div class="ph">' + icon('plan') + '平面图位置<span class="sp"></span><small>' + (a.kind === 'room' ? '占所在楼层' : '占所在房间') + '的百分比 · ' + (a.layout ? '手动' : '自动排布') + '</small></div>' +
+            '<div class="pad formgrid">' + [['x', '左边距'], ['y', '上边距'], ['w', '宽度'], ['h', '高度']].map(function (f) {
+              return '<label class="lbl">' + f[1] + ' %<input class="fld num" id="L' + f[0] + '" type="number" min="0" max="100" step="0.5" value="' + (L[f[0]] != null ? L[f[0]] : '') + '"></label>';
+            }).join('') + '</div>' +
+            '<div class="row foot"><button class="btn pri" id="lSave">' + icon('check') + '保存位置</button><button class="btn" id="lAuto"' + (a.layout ? '' : ' disabled') + '>' + icon('reset') + '恢复自动排布</button></div></section>';
+        }
         if (canChild.length) {
           html += '<section class="panel"><div class="ph">' + icon('plus') + '添加下级</div><div class="pad formgrid">' +
             '<label class="lbl">名称<input class="fld" id="cName" maxlength="40" placeholder="' + (a.kind === 'group' ? '如：A实验室' : '如：1号桌') + '"></label>' +
@@ -116,6 +124,9 @@
           case 'bAdd': LG.api('POST', '/api/areas/batch_desks', { parent_id: a.id, pattern: val('bPat'), start: Number(val('bFrom')), end: Number(val('bTo')) })
             .then(function (r) { LG.toast('已添加 ' + r.created.length + ' 张实验桌'); return load(); }).catch(LG.fail); return;
           case 'tAdd': LG.api('POST', '/api/nodes', { name: val('tName') || 'LG-' + a.name, area_id: a.id }).then(function (r) { tokenDialog('终端已登记', r.token); return load(); }).catch(LG.fail); return;
+          case 'lSave': LG.api('PATCH', '/api/areas/' + a.id, { layout: { x: Number(val('Lx')), y: Number(val('Ly')), w: Number(val('Lw')), h: Number(val('Lh')) } })
+            .then(after('位置已保存')).catch(LG.fail); return;
+          case 'lAuto': LG.api('PATCH', '/api/areas/' + a.id, { layout: null }).then(after('已恢复自动排布')).catch(LG.fail); return;
           case 'tBind': LG.api('PATCH', '/api/nodes/' + val('tFree'), { area_id: a.id }).then(after('已绑定')).catch(LG.fail); return;
         }
         var d = t.dataset;

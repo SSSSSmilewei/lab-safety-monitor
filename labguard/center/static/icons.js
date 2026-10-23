@@ -41,7 +41,9 @@ window.ICONS = {
  "light": "<path d=\"M8 2 H16 V22 H8 Z\"/><path d=\"M10 5 H14 V8 H10 Z\"/><path d=\"M10 10.5 H14 V13.5 H10 Z\"/><path d=\"M10 16 H14 V19 H10 Z\"/>",
  "flask": "<path d=\"M9 3 H15\"/><path d=\"M10 3 V9 L4 20 H20 L14 9 V3\"/><path d=\"M7 15 H17\"/>",
  "goggles": "<path d=\"M2 10 H22 V15 H15 L13 13 H11 L9 15 H2 Z\"/>",
- "reset": "<path d=\"M4 12 A8 8 0 1 0 7 6\"/><path d=\"M3 3 V8 H8\"/>"
+ "reset": "<path d=\"M4 12 A8 8 0 1 0 7 6\"/><path d=\"M3 3 V8 H8\"/>",
+ "list": "<path d=\"M9 6 H20\"/><path d=\"M9 12 H20\"/><path d=\"M9 18 H20\"/><path d=\"M4 5 H6 V7 H4 Z\"/><path d=\"M4 11 H6 V13 H4 Z\"/><path d=\"M4 17 H6 V19 H4 Z\"/>",
+ "plan": "<path d=\"M3 4 H21 V20 H3 Z\"/><path d=\"M3 11 H9 V4\"/><path d=\"M14 4 V9\"/><path d=\"M3 14 H21\"/><path d=\"M12 14 V20\"/>"
 };
 window.icon = function (name, size) {
   var s = size && size !== 20 ? ' style="width:' + size + 'px;height:' + size + 'px"' : '';

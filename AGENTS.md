@@ -61,8 +61,8 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `hub/jepa_worker.py` (247) | 电脑端 V-JEPA 2 画面异常检测（可选）；`--selftest` 不下载模型自检 |
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
-| `tools/` | `center_demo.py` 总后台演示（示例楼栋与账号 + 模拟终端上报，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（80 项）、`test_platform.py`（44 项）、`test_center.py`（56 项，总后台 + 开发板接入）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tools/` | `center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型、`gen_voice.py` 生成语音文件 |
+| `tests/` | `test_backend.py`（80 项）、`test_platform.py`（44 项）、`test_center.py`（71 项，总后台 + 开发板接入 + 平面图与演示画面）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）。有 `*_rknn_model/` 目录时优先用 NPU |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -140,7 +140,8 @@ ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/
 
 - 账号密码登录（会话 Cookie，12 小时），连续输错 5 次锁 5 分钟，首次登录必须改密；角色只有管理员 / 教师。教师只能看、管被授权的区域及其下级，授权可混合粒度（整栋 / 整间 / 单桌）。
 - 终端用节点密钥（`X-Node-Token`）调 `POST /api/node/report`：上报快照，取回阈值、指令（只有 `cut_power` / `mute`）、语音包。总后台**不能远程上电**。
-- 前端页面：总览、实验桌（画面 / 交叉验证 / 问答 / 远程断电）、阈值（按区域方案 + 逐项覆盖 + 硬件上限校验）、模型看板、语音、区域与终端（管理员）、账号与授权（管理员）。
+- 前端页面：总览（实验桌状态可切换「列表 / 平面图」：楼层 → 房间 → 实验桌，位置存在 `areas.layout`，单位为上级的百分比，未设置时自动沿走廊排布）、实验桌（画面 / 交叉验证 / 问答 / 远程断电）、阈值（按区域方案 + 逐项覆盖 + 硬件上限校验）、模型看板、语音、区域与终端（管理员）、账号与授权（管理员）。
+- 演示画面：管理员可给每张实验桌上传全景 / 台面图片（`PUT /api/desks/{id}/demo/{pano|desk}`，存在 `demo_frames` 表）。终端拿不到实时画面时 `/api/desks/{id}/frame/*.jpg` 返回演示画面，响应头 `X-Frame-Source: demo`，页面标明「演示画面」。只改总后台，不涉及开发板和下位机。
 - 字体在 `labguard/fonts/`（`/fonts/*`），无 CDN 依赖，断网可用。
 
 ## 9. 运行与测试
@@ -152,7 +153,7 @@ python run_app.py                          # 电脑大窗口 + 网页 http://127
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
 python tests/test_backend.py               # 80 项，无需硬件
 python tests/test_platform.py              # 44 项，无需硬件和大模型
-python tests/test_center.py                # 56 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格、开发板 CenterLink 真实 HTTP 接入
+python tests/test_center.py                # 71 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格、开发板 CenterLink 真实 HTTP 接入、平面图与演示画面
 python run_center.py                       # 总后台 http://127.0.0.1:8200（首次启动打印 admin 初始密码）
 python tools/center_demo.py                # 总后台演示数据 http://127.0.0.1:8210（账号见脚本开头）
 python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 requirements-host.txt）

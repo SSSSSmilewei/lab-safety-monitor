@@ -270,4 +270,39 @@ time.sleep(0.5)
 link._fail("URLError: 连接被拒绝")
 check(not link.online and "连接被拒绝" in link.status()["error"], "总后台断开时只记录状态，不影响本机")
 
+# ---------------------------------------------------------------------------
+print("[7] 平面图位置与演示画面")
+r = admin.patch(f"/api/areas/{ids['A']}", json={"layout": {"x": 2, "y": 4, "w": 44, "h": 40}})
+check(r.status_code == 200 and r.json()["layout"] == {"x": 2.0, "y": 4.0, "w": 44.0, "h": 40.0}, "设置房间在楼层平面图里的位置")
+check(admin.patch(f"/api/areas/{ids['A']}", json={"layout": {"x": 80, "y": 4, "w": 40, "h": 40}}).status_code == 422,
+      "超出上级范围的位置被拒绝")
+check(zhang.patch(f"/api/areas/{ids['A1']}", json={"layout": {"x": 1, "y": 1, "w": 10, "h": 10}}).status_code == 403,
+      "教师不能修改区域位置")
+tz = {a["id"]: a for a in zhang.get("/api/tree").json()}
+check(tz[ids["A"]]["layout"]["w"] == 44.0 and tz[ids["A1"]]["layout"] is None, "区域树带位置（未设置 = 自动排布）")
+admin.patch(f"/api/areas/{ids['A']}", json={"layout": None})
+check(store.area(ids["A"])["layout"] is None, "清除位置后恢复自动排布")
+
+JPG = b"\xff\xd8\xff\xe0" + b"0" * 64
+check(admin.get(f"/api/desks/{ids['B1']}/frame/pano.jpg").status_code == 503, "没有终端也没有演示画面 → 503")
+r = admin.put(f"/api/desks/{ids['B1']}/demo/pano", content=JPG, headers={"Content-Type": "image/jpeg"})
+check(r.status_code == 200, "管理员上传演示画面")
+check(zhang.put(f"/api/desks/{ids['B1']}/demo/pano", content=JPG, headers={"Content-Type": "image/jpeg"}).status_code == 403,
+      "教师不能上传演示画面")
+check(admin.put(f"/api/desks/{ids['B1']}/demo/pano", content=b"<svg/>", headers={"Content-Type": "image/jpeg"}).status_code == 422,
+      "内容不是图片 → 拒绝")
+check(admin.put(f"/api/desks/{ids['B']}/demo/pano", content=JPG, headers={"Content-Type": "image/jpeg"}).status_code == 404,
+      "只能给实验桌设置演示画面")
+r = zhang.get(f"/api/desks/{ids['B1']}/frame/pano.jpg")
+check(r.status_code == 200 and r.content == JPG and r.headers["x-frame-source"] == "demo", "无实时画面时返回演示画面并标明来源")
+check(li.get(f"/api/desks/{ids['B1']}/frame/pano.jpg").status_code == 404, "无权教师看不到演示画面")
+check(zhang.get("/api/tree").json() and {a["id"]: a for a in zhang.get("/api/tree").json()}[ids["B1"]]["demo"] == ["pano"],
+      "区域树标明哪些实验桌有演示画面")
+r = node.post("/api/node/report", headers={"X-Node-Token": node_token}, json={"snapshot": snap, "meta": {}})
+admin.put(f"/api/desks/{ids['A1']}/demo/desk", content=JPG, headers={"Content-Type": "image/jpeg"})
+r = admin.get(f"/api/desks/{ids['A1']}/frame/desk.jpg")
+check(r.status_code == 200 and r.headers["x-frame-source"] == "demo", "终端在线但取不到画面时也回落到演示画面")
+admin.delete(f"/api/desks/{ids['B1']}/demo/pano")
+check(admin.get(f"/api/desks/{ids['B1']}/frame/pano.jpg").status_code == 503, "清除演示画面")
+
 print(f"\n全部通过：{len(PASSED)} 项")
