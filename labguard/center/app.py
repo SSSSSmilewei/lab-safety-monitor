@@ -127,6 +127,10 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
     if os.path.isdir(STATIC_DIR):
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+    FONTS_DIR = os.path.join(ROOT, "fonts")      # 得意黑、JetBrains Mono（SIL OFL），本地提供，断网可用
+    if os.path.isdir(FONTS_DIR):
+        app.mount("/fonts", StaticFiles(directory=FONTS_DIR), name="fonts")
+
     @app.get("/font/zpix.ttf")
     def zpix_font():
         """旧版像素字体，仅界面风格选「像素」的账号会加载（Zpix 非开源协议，商用前需取得作者授权）"""
