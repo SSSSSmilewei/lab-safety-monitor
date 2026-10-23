@@ -4,6 +4,7 @@
     python tools/serial_probe.py --port /dev/ttyACM0
     python tools/serial_probe.py --cut           # 连接后发送一次断电指令，检查 ACK
     python tools/serial_probe.py --voice 1       # 播放 TF 卡 /mp3/0001.mp3
+    python tools/serial_probe.py --fan 100       # 手动设定排风扇 PWM（0–100），加 --humid 同时打开加湿
 """
 import os
 import sys
@@ -22,6 +23,8 @@ def main():
     ap.add_argument("--port", default=None)
     ap.add_argument("--cut", action="store_true")
     ap.add_argument("--voice", type=int, default=0)
+    ap.add_argument("--fan", type=int, default=None, help="手动设定排风扇 PWM 0–100（10 分钟有效）")
+    ap.add_argument("--humid", action="store_true", help="与 --fan 一起使用：同时打开加湿")
     ap.add_argument("--level", type=int, default=0, help="心跳携带的告警等级 0/1/2，用于测试三色灯")
     args = ap.parse_args()
 
@@ -50,11 +53,15 @@ def main():
             d = link.get_sensor_data()
             print(f"  环境 {d['temp']}℃ {d['humi']}% | 热源 {d['obj_temp']}℃ | 烟雾 {d['smoke']} | "
                   f"继电器 {'闭合' if d['relay_on'] else '断开'} | 锁定 {d['latched']} | "
-                  f"原因 {CUT_REASONS.get(d['cut_reason'])} | 心跳 {'正常' if d['pc_link_ok'] else '丢失'}")
+                  f"原因 {CUT_REASONS.get(d['cut_reason'])} | 心跳 {'正常' if d['pc_link_ok'] else '丢失'} | "
+                  f"风扇 {d.get('fan_pwm')}% 加湿 {d.get('humid_on')} 手动 {d.get('env_mode')}")
             if not sent:
                 sent = True
                 if args.voice:
                     print("  -> 播放语音", args.voice, link.play_voice(args.voice))
+                if args.fan is not None or args.humid:
+                    fan = args.fan or 0
+                    print(f"  -> 手动设定 风扇 {fan}% 加湿 {'开' if args.humid else '关'}", link.set_actuator(fan, args.humid))
                 if args.cut:
                     print("  -> 发送断电指令", link.send_power_off())
             if args.cut:
