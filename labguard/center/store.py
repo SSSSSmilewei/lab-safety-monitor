@@ -24,6 +24,7 @@ import time
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 ROLES = ("admin", "teacher")
+UI_STYLES = ("standard", "pixel")       # 界面风格：standard 新版字体（默认）；pixel 旧版 Zpix 像素字体
 AREA_KINDS = ("group", "room", "desk")
 COMMANDS = ("cut_power", "mute")          # 只能断电、静音；不存在上电 / 解锁指令
 SESSION_TTL_S = 12 * 3600
@@ -87,6 +88,9 @@ class Store:
         self._lock = threading.RLock()
         with self._lock:
             self._db.executescript(SCHEMA)
+            cols = {r[1] for r in self._db.execute("PRAGMA table_info(users)")}
+            if "ui_style" not in cols:     # 旧数据库升级
+                self._db.execute("ALTER TABLE users ADD COLUMN ui_style TEXT NOT NULL DEFAULT 'standard'")
             self._db.commit()
 
     # ------------------------------------------------------------------
@@ -143,25 +147,29 @@ class Store:
                         1 if must_change else 0, time.time()))
 
     def user(self, user_id: int) -> Optional[Dict[str, Any]]:
-        r = self._q("SELECT id, username, display_name, role, active, must_change, created FROM users WHERE id=?",
+        r = self._q("SELECT id, username, display_name, role, active, must_change, ui_style, created FROM users WHERE id=?",
                     (user_id,))
         return dict(r[0]) if r else None
 
     def users(self) -> List[Dict[str, Any]]:
         out = []
-        for r in self._q("SELECT id, username, display_name, role, active, must_change, created FROM users ORDER BY id"):
+        for r in self._q("SELECT id, username, display_name, role, active, must_change, ui_style, created FROM users ORDER BY id"):
             u = dict(r)
             u["grants"] = self.grants_of(u["id"])
             out.append(u)
         return out
 
     def update_user(self, user_id: int, display_name: Optional[str] = None, role: Optional[str] = None,
-                    active: Optional[bool] = None):
+                    active: Optional[bool] = None, ui_style: Optional[str] = None):
         u = self.user(user_id)
         if u is None:
             raise StoreError("用户不存在")
         if role is not None and role not in ROLES:
             raise StoreError("角色只能是 admin 或 teacher")
+        if ui_style is not None and ui_style not in UI_STYLES:
+            raise StoreError("界面风格只能是 standard 或 pixel")
+        if ui_style is not None:
+            self._x("UPDATE users SET ui_style=? WHERE id=?", (ui_style, user_id))
         demote = (role is not None and role != "admin") or active is False
         if u["role"] == "admin" and demote and self._admin_count(exclude=user_id) == 0:
             raise StoreError("至少保留一个启用的管理员")

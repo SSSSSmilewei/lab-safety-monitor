@@ -59,7 +59,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
 | `tools/` | `serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（63 项）、`test_platform.py`（44 项）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tests/` | `test_backend.py`（63 项）、`test_platform.py`（44 项）、`test_center.py`（39 项，总后台）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）。有 `*_rknn_model/` 目录时优先用 NPU |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -142,6 +142,7 @@ python run_app.py                          # 电脑大窗口 + 网页 http://127
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
 python tests/test_backend.py               # 63 项，无需硬件
 python tests/test_platform.py              # 44 项，无需硬件和大模型
+python tests/test_center.py                # 39 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格
 python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 requirements-host.txt）
 ```
 
@@ -181,3 +182,4 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、网页大屏、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、V-JEPA 2 电脑端流程。
 - 未验证：ESP32 固件已烧录真机并确认串口协议正常（2026-10-22 更新），但外设接线尚未开始，断电 / ACK / 复位、语音、烟雾全流程未实测；开发板（RK3588）已到手装好系统、NPU 推理正常（据队员反馈），开机自启未实测。V-JEPA 2 功能已按计划移除。
 - 截图和演示视频是电脑屏幕录像，不是真实实验台画面。
+- 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`），不是默认。

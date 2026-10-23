@@ -34,6 +34,7 @@ from center.store import Store, StoreError, COMMANDS
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 STATIC_DIR = os.path.join(HERE, "static")
+ZPIX_PATH = os.path.join(ROOT, "LabSafetyMonitor", "Zpix.ttf")
 COOKIE = "lg_session"
 ONLINE_S = 10.0              # 超过这么久没上报视为离线
 LOCK_FAILS, LOCK_S = 5, 300
@@ -126,6 +127,13 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
     if os.path.isdir(STATIC_DIR):
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+    @app.get("/font/zpix.ttf")
+    def zpix_font():
+        """旧版像素字体，仅界面风格选「像素」的账号会加载（Zpix 非开源协议，商用前需取得作者授权）"""
+        if not os.path.exists(ZPIX_PATH):
+            raise HTTPException(404)
+        return FileResponse(ZPIX_PATH, media_type="font/ttf", headers={"Cache-Control": "max-age=86400"})
+
     @app.get("/api/ping")
     def ping():
         return {"ok": True, "ts": time.time()}
@@ -176,6 +184,16 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
         response.set_cookie(COOKIE, token, httponly=True, samesite="strict", max_age=12 * 3600)
         return {"ok": True, "token": token}
 
+    @app.patch("/api/me/prefs")
+    async def my_prefs(request: Request, u=Depends(current_user)):
+        """个人偏好：界面风格（standard 新版字体 / pixel 旧版 Zpix 像素字体），只影响本账号"""
+        data = await body(request)
+        try:
+            store.update_user(u["id"], ui_style=data.get("ui_style"))
+        except StoreError as e:
+            bad(e)
+        return {"user": store.user(u["id"])}
+
     @app.get("/api/users")
     def list_users(u=Depends(admin_user)):
         return store.users()
@@ -199,7 +217,8 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
         data = await body(request)
         try:
             store.update_user(uid, data.get("display_name"), data.get("role"),
-                              data["active"] if isinstance(data.get("active"), bool) else None)
+                              data["active"] if isinstance(data.get("active"), bool) else None,
+                              data.get("ui_style"))
         except StoreError as e:
             bad(e)
         store.audit(who(u), "修改账号", {"id": uid, **{k: data[k] for k in data if k != "password"}})
