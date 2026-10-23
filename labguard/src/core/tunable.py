@@ -24,6 +24,8 @@ TUNABLE: Dict[str, Tuple[type, float, float, str, str]] = {
     "events.reminder_s": (float, 0, 600, "违规持续时重复语音间隔 s（0 = 不重复）", "提醒"),
     "vision.conf": (float, 0.1, 0.9, "检测置信度阈值", "识别"),
     "vision.iou": (float, 0.1, 0.9, "NMS IoU 阈值", "识别"),
+    "cross.mid_score": (int, 10, 60, "交叉验证中危判定风险分", "交叉验证"),
+    "cross.high_score": (int, 40, 100, "交叉验证高危判定风险分", "交叉验证"),
 }
 
 
@@ -70,6 +72,13 @@ def validate(changes: Dict[str, Any], current: Dict[str, Any],
         errors["rules.dry_burn_c"] = "干烧阈值必须比加热阈值高 10℃ 以上"
         changed.pop("rules.dry_burn_c", None)
         changed.pop("rules.heating_on_c", None)
+    # 交叉验证：高危分界必须比中危高 10 分以上
+    mid = changed.get("cross.mid_score", current.get("cross.mid_score"))
+    high = changed.get("cross.high_score", current.get("cross.high_score"))
+    if mid is not None and high is not None and float(high) < float(mid) + 10:
+        errors["cross.high_score"] = "高危判定分必须比中危高 10 分以上"
+        changed.pop("cross.mid_score", None)
+        changed.pop("cross.high_score", None)
     return changed, errors
 
 

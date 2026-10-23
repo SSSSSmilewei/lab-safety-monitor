@@ -163,7 +163,8 @@ class SafetyEngine(QObject):
                 "wm_phase": wm.get("phase"), "wm_risk": wm.get("risk"), "wm_eta_s": wm.get("eta_s"),
                 "latched": sm.latched,
                 "event_levels": [e.get("level") for e in active],
-            })
+            }, mid_score=float(cfg("cross.mid_score", cross_check.MID_SCORE)),
+                high_score=float(cfg("cross.high_score", cross_check.HIGH_SCORE)))
         except Exception as e:   # 交叉验证出错不影响断电规则；灯光仍由事件等级保底
             print(f"[Engine] 交叉验证异常: {e}")
             return self.risk

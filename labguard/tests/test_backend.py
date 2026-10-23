@@ -375,4 +375,35 @@ check(r[2]["unattended"] is False, "关闭人员模型时不判定无人值守�
 r = step(1)
 check("====== 最近事件 ======" in r[6], "日志文本包含最近事件，不会被每帧覆盖丢失")
 
+# ---------------------------------------------------------------------------
+print("[9] 交叉验证（人员 × 器皿 × 传感器 → 三级风险）")
+from src.core import cross_check as cc
+from src.core.tunable import validate as tv
+r = cc.assess({"person_present": True, "chem_items": []})
+check(r["level"] == "low" and r["light"] == 0 and r["score"] == 0, "无风险因素 → 低危绿灯")
+r = cc.assess({"person_present": True, "ppe_missing": ["ppe_goggles"], "chem_items": []})
+check(r["level"] == "low" and r["score"] == 8, "只看一路：没戴护目镜但台面空、未加热 → 仍是低危（提醒）")
+r = cc.assess({"person_present": True, "ppe_missing": ["ppe_goggles"], "heating": True,
+               "chem_items": ["Beaker", "Measuring Cylinder"], "wm_phase": "heating"})
+check(r["level"] == "mid" and r["score"] == 65 and r["light"] == 1, "加热 × 量筒 × 未戴护目镜 → 中危 65（黄灯）")
+check({f["source"] for f in r["factors"]} == {"器皿 × 传感器", "人员 × 传感器"}, "依据标明交叉来源")
+r = cc.assess({"person_present": False, "heating": True, "chem_items": ["Beaker"]})
+check(r["level"] == "high" and r["light"] == 2, "加热中台前无人 → 高危（红灯）")
+r = cc.assess({"person_present": True, "eating": True, "chem_items": ["Reagent Bottle"]})
+check(r["level"] == "mid" and r["score"] == 60, "台面有试剂 × 饮食 → 中危")
+r = cc.assess({"person_present": True, "eating": True, "chem_items": []})
+check(r["level"] == "low" and r["score"] == 25, "单独饮食（无试剂、未加热）→ 低危")
+r = cc.assess({"latched": True})
+check(r["level"] == "high" and r["score"] == 100, "断电锁定中 → 高危")
+r = cc.assess({"person_present": False, "heating": True, "sleeping": True, "eating": True, "chem_items": ["Reagent Bottle"],
+               "event_levels": ["CRITICAL"]})
+check(r["score"] == 100, "风险分封顶 100")
+r = cc.assess({"person_present": True, "ppe_missing": ["ppe_goggles"], "heating": True,
+               "chem_items": ["Beaker", "Measuring Cylinder"], "wm_phase": "heating"}, mid_score=20, high_score=60)
+check(r["level"] == "high" and r["thresholds"] == {"mid": 20, "high": 60}, "分界可配置：高危阈值调到 60 → 同一工况升为高危")
+ok, err = tv({"cross.mid_score": 50, "cross.high_score": 55}, {})
+check("cross.high_score" in err and not ok, "高危分界必须比中危高 10 分以上")
+ok, err = tv({"cross.high_score": 80}, {"cross.mid_score": 30})
+check(ok == {"cross.high_score": 80} and not err, "合法分界通过校验")
+
 print(f"\n全部通过：{len(PASSED)} 项")

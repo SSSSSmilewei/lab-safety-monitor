@@ -23,7 +23,7 @@ from src.core.events import events
 from src.core.tunable import tunable_spec, validate, label
 
 TRIM_WM = ("phase", "phase_text", "temp", "slope", "eta_s", "eta_boil_s", "plateau_s", "risk")
-RULE_PREFIXES = ("rules.", "presence.", "voting.", "events.", "vision.")
+RULE_PREFIXES = ("rules.", "presence.", "voting.", "events.", "vision.", "cross.")
 
 
 def node_token() -> str:
@@ -106,7 +106,7 @@ class CenterLink:
         if not version or version == self.profile_version:
             return
         rules = prof.get("rules") or {}
-        cur = {k: cfg(k) for k in ("rules.dry_burn_c", "rules.heating_on_c")}
+        cur = {k: cfg(k) for k in ("rules.dry_burn_c", "rules.heating_on_c", "cross.mid_score", "cross.high_score")}
         rule_part = {k: v for k, v in rules.items() if k.startswith(RULE_PREFIXES)}
         ok, errors = validate(rule_part, cur, tunable_spec())
         changed = {k: v for k, v in ok.items() if cfg(k) != v}

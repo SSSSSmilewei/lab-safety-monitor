@@ -196,7 +196,7 @@ def create_app(engine) -> FastAPI:
     @app.patch("/api/config", dependencies=[Depends(auth)])
     async def patch_config(request: Request):
         data = await body(request)
-        changed, errors = validate_tunable(data, {k: cfg(k) for k in ("rules.dry_burn_c", "rules.heating_on_c")})
+        changed, errors = validate_tunable(data, {k: cfg(k) for k in ("rules.dry_burn_c", "rules.heating_on_c", "cross.mid_score", "cross.high_score")})
         if errors:
             raise HTTPException(422, {"errors": errors})
         for k, v in changed.items():

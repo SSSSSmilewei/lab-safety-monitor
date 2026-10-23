@@ -126,6 +126,10 @@ r = admin.put(f"/api/profiles/{ids['D']}", json={"rules": {"serial.port": "/dev/
 check(r.status_code == 422, "白名单外参数被拒绝")
 r = admin.put(f"/api/profiles/{ids['D']}", json={"rules": {"rules.dry_burn_c": 999}})
 check(r.status_code == 422, "超出范围被拒绝")
+r = admin.put(f"/api/profiles/{ids['C']}", json={"rules": {"cross.high_score": 35}})
+check(r.status_code == 422, "交叉验证高危分界低于中危 + 10 被拒绝")
+r = admin.put(f"/api/profiles/{ids['C']}", json={"rules": {"cross.mid_score": 25, "cross.high_score": 60}})
+check(r.status_code == 200 and r.json()["resolved"]["rules"]["cross.high_score"] == 60, "交叉验证分界可按区域配置")
 
 # ---------------------------------------------------------------------------
 print("[5] 个人界面风格（旧版 Zpix 像素字体入口）")

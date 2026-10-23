@@ -574,7 +574,7 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
         if unknown:
             raise HTTPException(422, {"errors": {k: "不允许配置" for k in unknown}})
         # 总后台这里只做通用范围校验（硬上限放宽到 300℃ / 4000）；各终端按自己控制盒的硬上限再校验
-        merged = dict(presets_mod.PRESETS["standard"]["rules"])
+        merged = dict(presets_mod.PRESETS["standard"]["rules"], **{"cross.mid_score": 30, "cross.high_score": 70})
         merged.update(_resolved_rules(store.area(area_id)["parent_id"])["rules"]
                       if store.area(area_id)["parent_id"] else {})
         from src.core.tunable import tunable_spec

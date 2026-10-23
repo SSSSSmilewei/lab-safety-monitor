@@ -71,7 +71,7 @@
   }
 
   var STATIC = '<div class="cols">' +
-    '<section class="panel" aria-label="交叉验证规则" style="flex:1 1 520px"><div class="ph dk">' + icon('layers') + '交叉验证 · 风险因子权重<span class="sp"></span><small>中危 ≥ 30 · 高危 ≥ 70 · 上限 100</small></div>' +
+    '<section class="panel" aria-label="交叉验证规则" style="flex:1 1 520px"><div class="ph dk">' + icon('layers') + '交叉验证 · 风险因子权重<span class="sp"></span><small>默认中危 ≥ 30 · 高危 ≥ 70 · 可按区域调整</small></div>' +
     '<table class="tb"><thead><tr><th>数据源</th><th>风险因子</th><th>分值</th></tr></thead><tbody>' +
     [['人员 × 传感器', '加热中台前无人', '70'], ['人员 × 传感器', '加热中人员伏案', '70'], ['人员 × 器皿', '台面有试剂或加热中出现饮食', '60'],
       ['器皿 × 传感器', '加热时台面有不可加热量器', '35'], ['器皿 × 传感器', '加热中器皿靠近桌边', '35'], ['人员 × 传感器', '加热 / 沸腾中未佩戴护目镜或手套', '30–35'],
@@ -121,7 +121,7 @@
             return '<div class="stat">' + icon(/人员/.test(m.role) ? 'goggles' : 'flask', 28) + '<div><div class="hd" style="font-size:18px">' + esc((m.role || '').replace(/（.*?）/, '')) + '</div>' +
               '<div class="mut">' + esc((m.architecture || '').split('（')[0]) + ' · ' + (m.classes || []).length + ' 类</div><div class="num" style="font-weight:700">mAP50 ' + LG.fmt((m.final || {}).map50, 3) + '</div></div></div>';
           }).join('') +
-          '<div class="stat" style="background:var(--soft2)">' + icon('layers', 28) + '<div><div class="hd" style="font-size:18px">交叉验证系统</div><div class="mut">人员 × 器皿 × 传感器</div><div class="num" style="font-weight:700">三级 · 30 / 70</div></div></div>' +
+          '<div class="stat" style="background:var(--soft2)">' + icon('layers', 28) + '<div><div class="hd" style="font-size:18px">交叉验证系统</div><div class="mut">人员 × 器皿 × 传感器</div><div class="num" style="font-weight:700">三级 · 可按区域调整</div></div></div>' +
           '<div class="stat" style="background:var(--soft2)">' + icon('chip', 28) + '<div><div class="hd" style="font-size:18px">主控决策系统</div><div class="mut">规则 R1–R9 · 固件硬上限</div><div class="num" style="font-weight:700">按区域阈值</div></div></div></section>' +
           (card.missing ? '<div class="panel empty">' + esc(card.missing) + '</div>' : '') +
           '<div class="cols">' + ms.map(modelHtml).join('') + '</div>' + fieldHtml(card.field || {}) + STATIC;

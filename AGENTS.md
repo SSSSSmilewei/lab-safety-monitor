@@ -45,7 +45,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `src/core/env_control.py` (142) | 排风扇 / 加湿片：`control_law()` 纯函数 + `EnvController` |
 | `src/core/demo.py` (105) | 演示数据注入 `DemoInjector`（场景：normal / heating / dry_burn / smoke / humid / dry_air / hot / custom） |
 | `src/core/jepa_link.py` (48) | 接收电脑端 V-JEPA 2 上报的异常度 |
-| `src/core/cross_check.py` | 交叉验证：人员 × 器皿 × 传感器 → 工况、风险分、低 / 中 / 高三级与依据，驱动信号灯；不参与断电 |
+| `src/core/cross_check.py` | 交叉验证：人员 × 器皿 × 传感器 → 工况、风险分、低 / 中 / 高三级与依据，驱动信号灯；不参与断电。分界 `cross.mid_score` / `cross.high_score`（默认 30 / 70）可按区域调整 |
 | `src/core/center_link.py` | 开发板接入总后台：定时上报快照，取回区域阈值（按本机硬上限再校验）、断电 / 静音指令、语音包 |
 | `src/core/desk_zone.py` | 台面安全区：现场框选的多边形 + 危险边，判断器皿是否靠近 / 越过桌边；没框时用旧的单条桌边线 |
 | `src/hardware/sensor_worker.py` (180) | 遥测来源切换：下位机 → 演示数据 IPC 文件 → 自主模拟 |
@@ -62,7 +62,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
 | `tools/` | `center_demo.py` 总后台演示（示例楼栋与账号 + 模拟终端上报，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（63 项）、`test_platform.py`（44 项）、`test_center.py`（39 项，总后台）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tests/` | `test_backend.py`（75 项）、`test_platform.py`（44 项）、`test_center.py`（41 项，总后台）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）。有 `*_rknn_model/` 目录时优先用 NPU |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -150,9 +150,9 @@ cd labguard
 pip install -r requirements.txt          # Python 3.10–3.12
 python run_app.py                          # 电脑大窗口 + 网页 http://127.0.0.1:8080
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
-python tests/test_backend.py               # 63 项，无需硬件
+python tests/test_backend.py               # 75 项，无需硬件
 python tests/test_platform.py              # 44 项，无需硬件和大模型
-python tests/test_center.py                # 39 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格
+python tests/test_center.py                # 41 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格
 python run_center.py                       # 总后台 http://127.0.0.1:8200（首次启动打印 admin 初始密码）
 python tools/center_demo.py                # 总后台演示数据 http://127.0.0.1:8210（账号见脚本开头）
 python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 requirements-host.txt）

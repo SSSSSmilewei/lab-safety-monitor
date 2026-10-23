@@ -31,7 +31,7 @@ def _norm(items: Iterable[str]) -> set:
     return {str(i).strip().lower() for i in items or []}
 
 
-def assess(d: Dict[str, Any]) -> Dict[str, Any]:
+def assess(d: Dict[str, Any], mid_score: float = MID_SCORE, high_score: float = HIGH_SCORE) -> Dict[str, Any]:
     """
     输入字段（缺省视为未知 / 没有）：
       person_present: True / False / None（画面无效）
@@ -121,9 +121,9 @@ def assess(d: Dict[str, Any]) -> Dict[str, Any]:
         add("温度预测", f"干烧风险分 {wm_risk:.2f}", 30)
 
     score = min(100, sum(f["points"] for f in factors))
-    level = "high" if score >= HIGH_SCORE else "mid" if score >= MID_SCORE else "low"
+    level = "high" if score >= high_score else "mid" if score >= mid_score else "low"
     factors.sort(key=lambda f: -f["points"])
     return {"level": level, "level_text": LEVEL_TEXT[level], "light": LEVEL_LIGHT[level], "score": score,
-            "scene": scene, "factors": factors,
+            "scene": scene, "factors": factors, "thresholds": {"mid": mid_score, "high": high_score},
             "inputs": {"person_present": present, "ppe_missing": missing, "heatable": heatable,
                        "non_heatable": non_heatable, "heating": heating, "phase": phase}}

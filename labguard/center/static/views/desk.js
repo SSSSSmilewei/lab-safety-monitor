@@ -37,6 +37,7 @@
 
   function crossHtml(s) {
     var k = s.risk || {}, lv = k.level || 'low', score = k.score || 0;
+    var th = k.thresholds || { mid: 30, high: 70 };
     var col = { high: 'var(--high)', mid: 'var(--mid)', low: '#2EBD85' }[lv];
     var bg = { high: 'var(--high-bg)', mid: 'var(--mid-bg)', low: 'var(--low-bg)' }[lv];
     var voice = { high: '严厉干预', mid: '温和提醒', low: '静默' }[lv];
@@ -48,8 +49,8 @@
       '<span class="hd" style="font-size:32px;line-height:1.1">' + esc(k.level_text || '低危') + '</span><span class="big">' + score + '<span style="font-size:14px;color:var(--dim)">/100</span></span></div>' +
       '<div>' + esc(k.scene || '') + ' · 信号灯 ' + lightName + ' · 语音 ' + voice + '</div></div></div>' +
       '<div style="padding:10px 14px;border-bottom:2px solid var(--ink)"><div class="scorebar"><i class="fill" style="width:' + Math.min(100, score) + '%;background:' + col + '"></i>' +
-      '<i class="tick" style="left:30%"></i><i class="tick" style="left:70%"></i></div>' +
-      '<div class="scorelbl num mut"><span style="left:0">0 低危</span><span style="left:30%">30 中危</span><span style="left:70%">70 高危</span></div></div>' +
+      '<i class="tick" style="left:' + th.mid + '%"></i><i class="tick" style="left:' + th.high + '%"></i></div>' +
+      '<div class="scorelbl num mut"><span style="left:0">0 低危</span><span style="left:' + th.mid + '%">' + th.mid + ' 中危</span><span style="left:' + th.high + '%">' + th.high + ' 高危</span></div></div>' +
       '<div class="row head">判定依据</div>' +
       (factors.length ? factors.map(function (f) {
         var cross = /×/.test(f.source);
