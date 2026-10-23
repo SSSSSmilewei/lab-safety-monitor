@@ -84,7 +84,14 @@
       ['R5', '烟雾 ≥ 1800', 'cut'], ['R6–R8', '高湿 · 环境高温 · 量器受热', 'warn'], ['R9', '预测 ≤ 90 s 干烧 · 沸腾无人 300 s', 'warn']].map(function (r) {
       return '<tr><td class="num">' + r[0] + '</td><td>' + r[1] + '</td><td>' + (r[2] === 'cut' ? '<span class="tag t-high">断电</span>' : '<span class="tag t-mid">警告 / 提醒</span>') + '</td></tr>';
     }).join('') +
-    '<tr class="bad"><td class="num">固件</td><td>热源 ≥ 150℃ · 烟雾 ≥ 2500 · 心跳中断 30 s</td><td><span class="tag t-high">本地断电</span></td></tr></tbody></table></section></div>';
+    '<tr class="bad"><td class="num">固件</td><td>热源 ≥ 150℃ · 烟雾 ≥ 2500 · 心跳中断 30 s</td><td><span class="tag t-high">本地断电</span></td></tr></tbody></table></section></div>' +
+    '<div class="cols"><section class="panel" aria-label="分层上报规则" style="flex:1 1 100%"><div class="ph dk">' + icon('building') + '分层上报 · 学生端 / 实验室 / 实验楼<span class="sp"></span><small>同一次判断，三层等级各自计算</small></div>' +
+    '<table class="tb"><thead><tr><th>层级</th><th>计入的风险</th><th>呈现方式</th><th>低 / 中 / 高</th></tr></thead><tbody>' +
+    [['学生端', '全部风险因子（含饮食、防护、伏案、桌边等行为）', '语音台词 · 待处理事项 · 信号灯', '温和提醒 / 温和提醒 / 严厉干预'],
+      ['实验室', '加热、温度预测、烟雾、断电锁定与学生呼叫；行为违规仅记为知会', '处置队列 · 平面图配色 · 群消息', '仅记录 / 需关注 / 立即处置'],
+      ['实验楼', '断电锁定与紧急安全事件；实验室出现高危时标为关注', '处置队列 · 平面图配色', '无需介入 / 关注 / 需介入']].map(function (r) {
+      return '<tr><td><span class="tag t-ink">' + r[0] + '</span></td><td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td></tr>';
+    }).join('') + '</tbody></table></section></div>';
 
   function fieldHtml(fd) {
     var acc = fd.reviewed ? (fd.correct / fd.reviewed * 100).toFixed(1) + '%' : '--';

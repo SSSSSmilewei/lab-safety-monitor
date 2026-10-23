@@ -51,6 +51,32 @@ AGENT_KEYS = {
 }
 
 
+TIERS = ("student", "teacher", "building")
+TIER_LEVEL_TEXT = {"low": "低危", "mid": "中危", "high": "高危"}
+
+
+def tier_levels(snapshot: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """
+    分层上报：同一张实验桌对学生端、实验室老师、实验楼的等级（终端 cross_check.tiers 算好后随快照上报）。
+    旧版终端没有 tiers 时兜底：学生端与老师层沿用原等级，实验楼只在断电锁定时为高危。
+    """
+    s = snapshot or {}
+    risk = s.get("risk") or {}
+    tiers = risk.get("tiers") if isinstance(risk.get("tiers"), dict) else {}
+    base = risk.get("level") if risk.get("level") in TIER_LEVEL_TEXT else "low"
+    fallback = {
+        "student": {"level": base},
+        "teacher": {"level": base},
+        "building": {"level": "high" if s.get("latched") else "low"},
+    }
+    out = {}
+    for k in TIERS:
+        t = tiers.get(k) if isinstance(tiers.get(k), dict) else fallback[k]
+        lv = t.get("level") if t.get("level") in TIER_LEVEL_TEXT else fallback[k]["level"]
+        out[k] = dict(t, level=lv, level_text=TIER_LEVEL_TEXT[lv])
+    return out
+
+
 def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optional[str] = None) -> FastAPI:
     from src.core.tunable import TUNABLE, validate
 
@@ -338,13 +364,18 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
     def _online(n: Dict[str, Any]) -> bool:
         return bool(n.get("last_seen") and time.time() - n["last_seen"] < ONLINE_S)
 
-    def _node_brief(n: Dict[str, Any]) -> Dict[str, Any]:
+    def _node_brief(n: Dict[str, Any], tier: str = "teacher") -> Dict[str, Any]:
+        """一张实验桌的概况。risk_level 按 tier 取对应层级的等级（分层上报，见 tier_levels）"""
         s = n.get("snapshot") or {}
         risk = s.get("risk") or {}
         tel = s.get("telemetry") or {}
+        tiers = tier_levels(s)
+        t = tiers.get(tier) or tiers["student"]
         return {"id": n["id"], "name": n["name"], "online": _online(n), "last_seen": n.get("last_seen"),
                 "state": s.get("state"), "state_text": s.get("state_text"), "latched": s.get("latched"),
-                "risk_level": risk.get("level"), "risk_text": risk.get("level_text"), "scene": risk.get("scene"),
+                "risk_level": t["level"], "risk_text": t.get("level_text"), "scene": risk.get("scene"),
+                "tier": tier, "levels": {k: v["level"] for k, v in tiers.items()},
+                "reasons": t.get("reasons") or [], "notes": tiers["teacher"].get("notes") or [],
                 "obj_temp": tel.get("obj_temp"), "temp": tel.get("temp"), "humi": tel.get("humi"),
                 "events": [e.get("title") for e in (s.get("active_events") or [])[:3]]}
 
@@ -442,18 +473,20 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
     # 总览与实验桌
     # ------------------------------------------------------------------
     @app.get("/api/overview")
-    def overview(u=Depends(current_user)):
+    def overview(tier: Optional[str] = None, u=Depends(current_user)):
+        # 分层上报：管理员默认看实验楼层，教师默认看实验室老师层；可切换到其他层查看
+        tier = tier if tier in TIERS else ("building" if u["role"] == "admin" else "teacher")
         sc = store.scope(u)
         desks = []
         for n in store.nodes():
             if n["area_id"] is None or (sc is not None and n["area_id"] not in sc):
                 continue
-            b = _node_brief(n)
+            b = _node_brief(n, tier)
             b["area_id"] = n["area_id"]
             b["path"] = store.path_name(n["area_id"])
             desks.append(b)
         count = lambda f: sum(1 for d in desks if f(d))
-        return {"desks": desks, "summary": {
+        return {"tier": tier, "desks": desks, "summary": {
             "total": len(desks), "online": count(lambda d: d["online"]),
             "high": count(lambda d: d["online"] and (d["risk_level"] == "high" or d["latched"])),
             "mid": count(lambda d: d["online"] and d["risk_level"] == "mid" and not d["latched"]),

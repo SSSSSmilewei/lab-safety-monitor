@@ -45,7 +45,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `src/core/env_control.py` (142) | 排风扇 / 加湿片：`control_law()` 纯函数 + `EnvController` |
 | `src/core/demo.py` (105) | 演示数据注入 `DemoInjector`（场景：normal / heating / dry_burn / smoke / humid / dry_air / hot / custom） |
 | `src/core/jepa_link.py` (48) | 接收电脑端 V-JEPA 2 上报的异常度 |
-| `src/core/cross_check.py` | 交叉验证：人员 × 器皿 × 传感器 → 工况、风险分、低 / 中 / 高三级与依据，驱动信号灯；不参与断电。分界 `cross.mid_score` / `cross.high_score`（默认 30 / 70）可按区域调整 |
+| `src/core/cross_check.py` | 交叉验证：人员 × 器皿 × 传感器 → 工况、风险分、低 / 中 / 高三级与依据，驱动信号灯；不参与断电。分界 `cross.mid_score` / `cross.high_score`（默认 30 / 70）可按区域调整。`tiers()` 做**分层上报**：同一次判断给出学生端 / 实验室老师 / 实验楼三层各自的等级（见第 5 节末） |
 | `src/core/center_link.py` | 开发板接入总后台：定时上报快照，取回区域阈值（按本机硬上限再校验）、断电 / 静音指令、语音包 |
 | `src/core/desk_zone.py` | 台面安全区：现场框选的多边形 + 危险边，判断器皿是否靠近 / 越过桌边；没框时用旧的单条桌边线 |
 | `src/hardware/sensor_worker.py` (180) | 遥测来源切换：下位机 → 演示数据 IPC 文件 → 自主模拟 |
@@ -62,7 +62,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh，视美泰 AIOT-3588A 和香橙派 5 通用）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
 | `tools/` | `center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面、`--live LG-A01` 把一张桌留给真实开发板程序接入，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型（x86 上运行，附模拟器对比）、`check_npu.py` 板子上检查 NPU（版本、加载、速度、和 .pt 对比）、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（80 项）、`test_platform.py`（44 项）、`test_center.py`（71 项，总后台 + 开发板接入 + 平面图与演示画面）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tests/` | `test_backend.py`（87 项）、`test_platform.py`（44 项）、`test_center.py`（78 项，总后台 + 开发板接入 + 平面图与演示画面 + 分层视角）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）、`*_rknn_model/`（导出好的 NPU 模型，FP16，入库）。只有在 Rockchip 板子上才用 RKNN；NPU 加载失败时自动改用 .pt 并记一条事件 |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -101,6 +101,19 @@ ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp, humi, obj_t
 - 防抖：器皿识别结果保留 `rules.item_hold_s` 3 s；同类事件解除后 `events.retrigger_s` 10 s 内再出现算同一次。
 - 锁定：断电后保持 CRITICAL，直到下位机上报复位（事件码 5，或锁定标志由真变假）。没接下位机时，危险解除 `sim_latch_release_s` 10 s 后自动解锁（只用于演示）。
 - 等级：INFO < NOTICE < WARNING < CRITICAL。
+
+### 分层上报（`cross_check.tiers()`，随快照 `risk.tiers` 上报总后台）
+
+同一次判断，对三层是三套不同的等级，越往上越只关心需要介入的事：
+
+| 层级 | 计入的风险 | 呈现 | 低 / 中 / 高 |
+|---|---|---|---|
+| 学生端 `student` | 全部因子（即原 `risk.level`） | 语音台词、小屏待处理事项、信号灯 | 温和提醒 / 温和提醒 / 严厉干预 |
+| 实验室老师 `teacher` | 只算来源含传感器 / 温度预测的因子 + 安全规则事件（`hazard_levels`，即 `HAZARD_KINDS` 的活动事件）+ `cross.call_hold_s` 内的「呼叫教师」（+40）；饮食、防护、伏案、桌边这类行为因子只进 `notes`（知会） | 总后台处置队列、平面图配色、群消息 | 仅记录 / 需关注 / 立即处置 |
+| 实验楼 `building` | 断电锁定或 CRITICAL 安全事件 → 高；实验室层为高 → 中；其余 → 低 | 总后台处置队列、平面图配色 | 无需介入 / 关注 / 需介入 |
+
+- 群消息（`notify.webhook_url`）默认跳过行为事件（`notify.skip_behavior: true`，`events.BEHAVIOR_KINDS`）。
+- 学生端等级和语音、信号灯的关系不变；分层只影响往上报的部分，不参与断电。
 
 ## 6. 温度预测（`world_model.py`）
 
@@ -142,6 +155,7 @@ ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/
 
 - 账号密码登录（会话 Cookie，12 小时），连续输错 5 次锁 5 分钟，首次登录必须改密；角色只有管理员 / 教师。教师只能看、管被授权的区域及其下级，授权可混合粒度（整栋 / 整间 / 单桌）。
 - 终端用节点密钥（`X-Node-Token`）调 `POST /api/node/report`：上报快照，取回阈值、指令（只有 `cut_power` / `mute`）、语音包。总后台**不能远程上电**。
+- 分层视角：`GET /api/overview?tier=building|teacher|student`，默认管理员 = 实验楼、教师 = 实验室；处置队列、统计、平面图配色都按该层等级（`app.tier_levels()`，旧版终端没有 `risk.tiers` 时兜底：学生端 / 老师层沿用原等级，实验楼只在断电锁定时为高）。实验桌详情的交叉验证面板列出三层等级，模型看板有分层规则表。
 - 前端页面：总览（实验桌状态可切换「列表 / 平面图」：楼层 → 房间 → 实验桌，位置存在 `areas.layout`，单位为上级的百分比，未设置时自动沿走廊排布）、实验桌（画面 / 交叉验证 / 问答 / 远程断电）、阈值（按区域方案 + 逐项覆盖 + 硬件上限校验）、模型看板、语音、区域与终端（管理员）、账号与授权（管理员）。
 - 演示画面：管理员可给每张实验桌上传全景 / 台面图片（`PUT /api/desks/{id}/demo/{pano|desk}`，存在 `demo_frames` 表）。终端拿不到实时画面时 `/api/desks/{id}/frame/*.jpg` 返回演示画面，响应头 `X-Frame-Source: demo`，页面标明「演示画面」。只改总后台，不涉及开发板和下位机。
 - 字体在 `labguard/fonts/`（`/fonts/*`），无 CDN 依赖，断网可用。
@@ -154,9 +168,9 @@ conda env create -f environment.yml       # 推荐：Python 3.12，电脑和开�
 pip install -r requirements.txt          # 或者不用 conda：Python 3.10–3.12
 python run_app.py                          # 电脑大窗口 + 网页（网址见启动窗口，本仓库 config.yaml 为 http://127.0.0.1:8180，端口被占用时自动顺延）
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
-python tests/test_backend.py               # 80 项，无需硬件
+python tests/test_backend.py               # 87 项，无需硬件
 python tests/test_platform.py              # 44 项，无需硬件和大模型
-python tests/test_center.py                # 71 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格、开发板 CenterLink 真实 HTTP 接入、平面图与演示画面
+python tests/test_center.py                # 78 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格、开发板 CenterLink 真实 HTTP 接入、平面图与演示画面、分层视角
 python run_center.py                       # 总后台 http://127.0.0.1:8200（首次启动打印 admin 初始密码）
 python tools/center_demo.py                # 总后台演示数据 http://127.0.0.1:8210（账号见脚本开头）
 python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 requirements-host.txt）
@@ -200,6 +214,7 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 ## 12. 当前状态
 
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、开发板本机控制台、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、交叉验证（三级风险 + 处置动作）、台面安全区。
+- 分层上报（2026-10-23）：`cross_check.tiers()`、总后台分层视角、演示脚本的「摘防护吃东西」场景（LG-E01）已完成；新增用例只在无界面库的环境里单独跑过判级与兜底逻辑，完整三套测试需在装好依赖的电脑上重跑确认。
 - 总后台（2026-10-23）：后端 + 网页前端完成，浏览器实测通过（`tools/center_demo.py` 演示数据）；开发板程序（`center_link.py`）与总后台已在本机联调通过（上报、阈值下发与硬上限拦截、远程断电 / 静音、画面与问答代理、断线重连、离线判定，另有自动测试），尚未在真实开发板上跑。模型看板的训练集图片数需管理员在页面上填写（数据集不在仓库里）；语音合成需在总后台机器上 `pip install edge-tts` 且联网。
 - 开发板：视美泰 AIOT-3588A（4GB，系统在 16GB TF 卡，Ubuntu 22.04）已调通小屏、USB 摄像头、开机自启（edge 模式）。RKNN 模型已导出（rknn-toolkit2 2.3.2，FP16），真机 NPU 实测（`tools/check_npu.py`）ppe_best 120 ms/帧、chem_best 116 ms/帧，结果与 .pt 一致。
 - ESP32 固件：已在 ESP32-S3-N8R8 真机烧录，串口协议、断电 ACK 往返（中位 4.9 ms）实测正常；蜂鸣器为非阻塞。传感器、继电器、控制键接上后的整机联调未完成。V-JEPA 2 功能已按计划移除。

@@ -26,6 +26,7 @@ from src.config import cfg, resolve_path
 LEVEL_RANK = {"INFO": 0, "NOTICE": 1, "WARNING": 2, "CRITICAL": 3}
 LEVEL_LIGHT = {"INFO": 0, "NOTICE": 1, "WARNING": 1, "CRITICAL": 2}
 LEVEL_LIGHT_FLOOR = {"INFO": 0, "NOTICE": 0, "WARNING": 1, "CRITICAL": 2}   # 事件对灯光的最低要求
+BEHAVIOR_KINDS = {"ppe_goggles", "ppe_coat", "ppe_gloves", "ppe_mask", "ppe_headmask", "eating", "sleeping", "edge_risk"}
 LEVEL_TAG = {"INFO": "信息", "NOTICE": "提醒", "WARNING": "警告", "CRITICAL": "紧急"}
 
 
@@ -271,6 +272,9 @@ class EventCenter:
         url = (cfg("notify.webhook_url", "") or "").strip()
         min_level = cfg("notify.min_level", "WARNING")
         if not url or LEVEL_RANK.get(ev["level"], 0) < LEVEL_RANK.get(min_level, 2):
+            return
+        # 分层上报：行为违规（饮食、防护、伏案、桌边）由实验台当场提醒学生，不推送到老师群
+        if cfg("notify.skip_behavior", True) and ev["kind"] in BEHAVIOR_KINDS:
             return
         content = f"【实验室安全{LEVEL_TAG.get(ev['level'], '')}】{ev['time_str']} {ev['title']}\n{ev['message']}"
         self._enqueue_raw(("webhook", url, content))

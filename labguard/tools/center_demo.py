@@ -37,13 +37,31 @@ SCENES = {
               [("NOTICE", "未佩戴护目镜"), ("NOTICE", "未佩戴手套")], False),
     "cylinder": ("加热操作中", "mid", 65, 63.2, [("器皿 × 传感器", "加热时台面有不可加热量器（measuring cylinder）", 35),
                                             ("人员 × 传感器", "加热中未佩戴护目镜（飞溅 / 烫伤风险）", 30)],
-                 [("WARNING", "量器被加热"), ("NOTICE", "未佩戴护目镜")], False),
+                 [("NOTICE", "量器被加热"), ("NOTICE", "未佩戴护目镜")], False),
     "away": ("加热中，人员离岗", "high", 100, 97.8, [("人员 × 传感器", "正在加热但台前无人", 70), ("规则引擎", "存在警告事件", 40)],
              [("WARNING", "加热无人值守")], False),
     "latched": ("断电锁定中", "high", 100, 131.5, [("规则引擎", "断电锁定中：已发生过高危情况", 100)],
                 [("CRITICAL", "干烧")], True),
     "oil": ("加热操作中", "low", 8, 186.0, [("人员模型", "未佩戴口罩", 8)], [], False),
+    # 分层上报示例：摘防护吃东西 —— 学生端高危（严厉干预），实验室只记知会，实验楼不打扰
+    "apple": ("台面操作中（未加热）", "high", 89, None, [("规则引擎", "存在警告事件", 40), ("人员模型", "实验区饮食", 25),
+              ("人员模型", "未佩戴护目镜", 8), ("人员模型", "未佩戴口罩", 8), ("人员模型", "未佩戴头罩", 8)],
+              [("WARNING", "实验区饮食"), ("NOTICE", "未佩戴护目镜"), ("NOTICE", "未佩戴口罩")], False),
 }
+# 属于安全规则的事件（其余是行为事件）：决定实验室 / 实验楼两层是否计入
+HAZARD_TITLES = {"量器被加热", "加热无人值守", "干烧"}
+
+
+def _cross_check():
+    """按文件加载交叉验证模块（纯标准库），演示脚本不需要界面库"""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("cross_check", os.path.join(ROOT, "src", "core", "cross_check.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+CC = _cross_check()
 PPE = [("ppe_goggles", "护目镜"), ("ppe_coat", "实验服"), ("ppe_gloves", "手套"), ("ppe_mask", "口罩")]
 
 
@@ -53,6 +71,9 @@ def snapshot(scene: str, t: float):
     bad = {"未佩戴护目镜": "ppe_goggles", "未佩戴手套": "ppe_gloves", "未佩戴口罩": "ppe_mask"}
     missing = {bad[k] for k in bad for f in factors if k.replace("未佩戴", "") in f[1]}
     present = scene not in ("idle", "away")
+    risk = {"level": lv, "level_text": {"high": "高危", "mid": "中危", "low": "低危"}[lv], "light": {"low": 0, "mid": 1, "high": 2}[lv],
+            "score": score, "scene": s, "factors": [{"source": a, "text": b, "points": c} for a, b, c in factors]}
+    risk["tiers"] = CC.tiers(risk, {"latched": latched, "hazard_levels": [l for l, ti in evs if ti in HAZARD_TITLES]})
     return {
         "state": "CRITICAL" if latched or lv == "high" else "WARNING" if lv == "mid" else "NORMAL",
         "state_text": "断电锁定中" if latched else {"high": "危险", "mid": "注意", "low": "正常"}[lv],
@@ -63,8 +84,7 @@ def snapshot(scene: str, t: float):
         "vision": {"ok": True, "person_present": present, "fps": "9.8 FPS",
                    "ppe": [{"kind": k, "name": n, "status": ("bad" if k in missing else "ok") if present else "unknown"} for k, n in PPE]},
         "world_model": {"phase_text": "升温中" if temp and temp < 100 else "高温", "temp": temp, "eta_boil_s": 240 if scene == "cylinder" else None, "eta_s": None},
-        "risk": {"level": lv, "level_text": {"high": "高危", "mid": "中危", "low": "低危"}[lv], "light": {"low": 0, "mid": 1, "high": 2}[lv],
-                 "score": score, "scene": s, "factors": [{"source": a, "text": b, "points": c} for a, b, c in factors]},
+        "risk": risk,
         "active_events": [{"level": l, "title": ti, "message": "", "time_str": time.strftime("%H:%M:%S", time.localtime(t - 40 * i))}
                           for i, (l, ti) in enumerate(evs)],
         "stats": {"reviewed": 12, "correct": 11},
@@ -87,7 +107,7 @@ PLAN = {
     "LG-B01": ("away", 150), "LG-B02": ("idle", 150),
     "LG-C01": ("cylinder", 150), "LG-C02": ("bench", 150), "LG-C03": ("latched", 150),
     "LG-D01": ("oil", 150), "LG-D02": ("oil", 400),
-    "LG-E01": ("idle", 150), "LG-E02": ("safe_heat", 150),
+    "LG-E01": ("apple", 150), "LG-E02": ("safe_heat", 150),
 }
 IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp")
 MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}

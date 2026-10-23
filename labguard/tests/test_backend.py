@@ -423,4 +423,24 @@ check("cross.high_score" in err and not ok, "高危分界必须比中危高 10 �
 ok, err = tv({"cross.high_score": 80}, {"cross.mid_score": 30})
 check(ok == {"cross.high_score": 80} and not err, "合法分界通过校验")
 
+print("[10] 分层上报（学生端 / 实验室 / 实验楼）")
+lv = lambda r: tuple(r["tiers"][k]["level"] for k in ("student", "teacher", "building"))
+r = cc.assess({"person_present": True, "eating": True, "ppe_missing": ["ppe_goggles", "ppe_mask", "ppe_headmask"],
+               "event_levels": ["WARNING", "NOTICE"], "hazard_levels": []})
+check(lv(r) == ("high", "low", "low") and r["tiers"]["teacher"]["action"] == "仅记录",
+      "摘防护吃东西：学生端高危，实验室只记录，实验楼不打扰")
+check("实验区饮食" in r["tiers"]["teacher"]["notes"], "行为违规在实验室层记为知会")
+r = cc.assess({"person_present": True, "ppe_missing": ["ppe_goggles"], "heating": True,
+               "chem_items": ["Beaker", "Measuring Cylinder"], "wm_phase": "heating", "hazard_levels": ["NOTICE"]})
+check(lv(r) == ("mid", "mid", "low"), "加热时放量筒：学生端、实验室中危，实验楼不打扰")
+r = cc.assess({"person_present": True, "heating": True, "chem_items": ["Beaker"], "wm_phase": "overheat",
+               "wm_risk": 0.7, "event_levels": ["WARNING"], "hazard_levels": ["WARNING"]})
+check(lv(r) == ("high", "high", "mid") and r["tiers"]["building"]["action"] == "关注", "快烧干：实验室立即处置，实验楼关注")
+r = cc.assess({"latched": True, "event_levels": ["CRITICAL"], "hazard_levels": ["CRITICAL"]})
+check(lv(r) == ("high", "high", "high") and r["tiers"]["building"]["action"] == "需介入", "断电锁定：三层均为最高")
+r = cc.assess({"person_present": True, "called": True, "hazard_levels": []})
+check(lv(r) == ("low", "mid", "low"), "学生呼叫教师：实验室层升为中危")
+r = cc.assess({"person_present": True, "eating": True, "event_levels": ["WARNING"]})
+check(r["tiers"]["teacher"]["level"] == "mid", "未提供 hazard_levels 时退回 event_levels（兼容旧调用）")
+
 print(f"\n全部通过：{len(PASSED)} 项")
