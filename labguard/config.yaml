@@ -123,6 +123,7 @@ demo:
 
 # ---- 界面 ----
 ui:
+  style: standard       # 实验台小屏风格：standard = 新版（墨色硬边 + 得意黑）；pixel = 旧版像素风格（Zpix 字体）
   wave_fps:             # 海浪动画帧率；留空 = 自动（香橙派等 ARM 设备 10，PC 25）；0 = 静止（最省 CPU）
   kiosk_size:           # 小屏分辨率；留空 = 自动读取屏幕。PC 上调试小屏可写 [800, 480]
 

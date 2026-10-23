@@ -81,6 +81,10 @@ from serial_comm import SerialComm
 # 全局字体配置
 PIXEL_FONT_FAMILY = "monospace"
 ICON_FONT_FAMILY = "monospace"
+# 标准风格（实验台小屏 ui.style = standard）：标题得意黑、数字 JetBrains Mono（labguard/fonts，SIL OFL），正文用系统中文黑体
+HD_FONT_FAMILY = "Smiley Sans"
+NUM_FONT_FAMILY = "JetBrains Mono"
+BODY_FONTS = "'Noto Sans CJK SC', 'Source Han Sans SC', 'WenQuanYi Micro Hei', 'Microsoft YaHei', 'PingFang SC', sans-serif"
 
 
 # ==============================================================================
@@ -169,6 +173,49 @@ def load_pixel_font():
                     ICON_FONT_FAMILY = fams[0]
                     print(f"成功加载图标字体: {ICON_FONT_FAMILY}")
             break
+
+
+def load_ui_fonts():
+    """加载标准风格用的得意黑与 JetBrains Mono（Qt 用 OTF / TTF）；找不到就退回系统字体"""
+    global HD_FONT_FAMILY, NUM_FONT_FAMILY
+    fonts_dir = os.path.join(project_root, "fonts")
+    for name, which in (("SmileySans-Oblique.otf", "hd"), ("JetBrainsMono-Bold.ttf", "num")):
+        path = os.path.join(fonts_dir, name)
+        if not os.path.exists(path):
+            continue
+        fid = QFontDatabase.addApplicationFont(path)
+        fams = QFontDatabase.applicationFontFamilies(fid) if fid != -1 else []
+        if fams and which == "hd":
+            HD_FONT_FAMILY = fams[0]
+        elif fams:
+            NUM_FONT_FAMILY = fams[0]
+
+
+def get_qss_standard(line="#1A1F3D", ink="#1A1F3D"):
+    """标准风格（实验台小屏）：墨色硬边 + 系统中文黑体；与总后台设计规范一致"""
+    return f"""
+    * {{ font-family: {BODY_FONTS}; }}
+    QLabel {{ color: {ink}; background: transparent; border: none; }}
+    QPushButton {{
+        background-color: {T.PAPER}; color: {ink}; font-weight: bold;
+        border: 2px solid {line}; border-radius: 0px; padding: 7px 12px;
+        margin-top: 0px; margin-left: 0px; margin-bottom: 4px; margin-right: 4px;
+    }}
+    QPushButton:checked {{
+        background-color: {line}; color: {T.PAPER};
+        margin-top: 2px; margin-left: 2px; margin-bottom: 2px; margin-right: 2px;
+    }}
+    QPushButton:pressed {{
+        background-color: {T.PRIMARY}; color: {T.PAPER};
+        margin-top: 4px; margin-left: 4px; margin-bottom: 0px; margin-right: 0px;
+    }}
+    QPushButton:disabled {{ background-color: transparent; color: #9FA8DA; border: 2px dashed #9FA8DA; }}
+    QScrollArea {{ background-color: transparent; border: none; }}
+    QScrollBar:vertical {{ background-color: {T.PAPER}; width: 14px; border: 2px solid {line}; margin: 0px; }}
+    QScrollBar::handle:vertical {{ background-color: {line}; min-height: 24px; }}
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: none; }}
+    """
 
 
 def get_qss():

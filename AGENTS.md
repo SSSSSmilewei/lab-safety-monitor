@@ -53,7 +53,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `src/agent/llm_client.py` (173) | OpenAI 兼容客户端，线路 `agent.route`：auto（远程→本地）/ remote / local / off；只用标准库 urllib |
 | `src/agent/rag.py` (76) | 安全手册检索：`knowledge/*.md` 按"## 标题"切条，中文二元组 + BM25 |
 | `src/web/server.py` (433) + `src/web/static/` | 网页大屏（FastAPI + 原生 JS，无构建、无 CDN）。口令鉴权；接口见第 8 节 |
-| `src/ui/kiosk.py` (593) | 实验台小屏（PyQt/PySide，800×480 为基准自适应） |
+| `src/ui/kiosk.py` | 实验台小屏（PyQt/PySide，800×480 为基准自适应）。面向同学：状态页左「待处理事项」（交叉验证依据的 `action`）、中热源、右防护与环境。`ui.style`：standard（默认）/ pixel（旧版 Zpix） |
 | `src/ui/main_window.py` (1590) | 电脑大窗口（项目最早的完整界面）；设计令牌类 `T`、`Card`、`Chip`、`load_pixel_font()` 被小屏复用 |
 | `LabSafetyMonitor/dual_inference.py` (849) | 摄像头读取 + 两个 YOLO 模型推理 + 在场判断 + 时间投票 + 伏案 + 桌边线；产出 `alarms` 字典和带框画面 |
 | `LabSafetyMonitor/serial_comm.py` (481) | 下位机串口协议（第 7 节）；单例 `SerialComm.get_shared()` |
@@ -170,7 +170,7 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 | 为什么断电 / 为什么报警 | `src/core/state_machine.py` 的 `evaluate()`，事件标题对应规则 |
 | 新增一条安全规则 | `state_machine.py`：在 `evaluate()` 里 `add(kind, level, title, message, cut=...)`，并把 kind 加进 `HAZARD_KINDS`；语音曲目加到 `config.yaml → events.voice`；在 `tests/` 补测试 |
 | 识别类别、违规映射 | `dual_inference.py` 顶部 `PPE_VIOLATION_KINDS`、`VISUAL_KIND_TITLES` |
-| 小屏某个显示 | `src/ui/kiosk.py` 的 `_refresh_guard()` / `_refresh_events()` |
+| 小屏某个显示 | `src/ui/kiosk.py` 的 `_refresh_todo()` / `_refresh_guard()` / `_refresh_events()` |
 | 网页某个显示 | `src/web/static/app.js` 的 `render*()` 函数；样式 `app.css`；结构 `index.html` |
 | 网页数据从哪来 | `SafetyEngine.snapshot()`（`engine.py`） |
 | 安全助手说了什么、为什么 | `src/agent/agent.py`：`SYSTEM_PROMPT`、`TOOLS`、`RULE_ADVICE`；线路在 `llm_client.py` |
@@ -194,4 +194,4 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、网页大屏、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、V-JEPA 2 电脑端流程。
 - 未验证：ESP32 固件已烧录真机并确认串口协议正常（2026-10-22 更新），但外设接线尚未开始，断电 / ACK / 复位、语音、烟雾全流程未实测；开发板（RK3588）已到手装好系统、NPU 推理正常（据队员反馈），开机自启未实测。V-JEPA 2 功能已按计划移除。
 - 截图和演示视频是电脑屏幕录像，不是真实实验台画面。
-- 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」，不是默认：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`）；开发板本机控制台按浏览器切换（恢复旧版靛蓝描边 + Zpix）。
+- 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」，不是默认：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`）；开发板本机控制台按浏览器切换（恢复旧版靛蓝描边 + Zpix）；实验台小屏用 `config.yaml → ui.style: pixel`。电脑大窗口（main_window.py）保持旧版。

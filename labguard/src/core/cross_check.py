@@ -22,6 +22,8 @@ MID_SCORE, HIGH_SCORE = 30, 70
 HEATABLE = {"beaker", "conical flask", "flat bottom flask", "round bottom flask", "pear shaped flask", "test tube"}
 NON_HEATABLE = {"volumetric flask", "measuring cylinder", "reagent bottle", "burette", "pipette", "wash bottle"}
 REAGENT = {"reagent bottle", "wash bottle"}
+ITEM_NAMES = {"volumetric flask": "容量瓶", "measuring cylinder": "量筒", "reagent bottle": "试剂瓶", "burette": "滴定管",
+              "pipette": "移液管", "wash bottle": "洗瓶"}
 
 PPE_NAMES = {"ppe_goggles": "护目镜", "ppe_coat": "实验服", "ppe_gloves": "手套", "ppe_mask": "口罩",
              "ppe_headmask": "头罩"}
@@ -43,12 +45,13 @@ def assess(d: Dict[str, Any], mid_score: float = MID_SCORE, high_score: float = 
       wm_phase, wm_risk, wm_eta_s: 温度预测
       latched:        是否断电锁定中
       event_levels:   当前活动事件的等级列表（NOTICE / WARNING / CRITICAL）
-    返回：level / level_text / light / score / scene / factors[{source, text, points}]
+    返回：level / level_text / light / score / scene / factors[{source, text, points, action}]
+    action 是给台前同学的处置动作（实验台小屏「待处理事项」直接显示），没有可做的动作时为空
     """
     factors: List[Dict[str, Any]] = []
 
-    def add(source: str, text: str, points: int):
-        factors.append({"source": source, "text": text, "points": points})
+    def add(source: str, text: str, points: int, action: str = ""):
+        factors.append({"source": source, "text": text, "points": points, "action": action})
 
     items = _norm(d.get("chem_items"))
     heatable = sorted(items & HEATABLE)
@@ -83,42 +86,42 @@ def assess(d: Dict[str, Any], mid_score: float = MID_SCORE, high_score: float = 
 
     # ---------- 交叉规则：人员 × 器皿 × 温度 ----------
     if latched:
-        add("规则引擎", "断电锁定中：已发生过高危情况", 100)
+        add("规则引擎", "断电锁定中：已发生过高危情况", 100, "勿触碰受热器皿，排查后长按控制盒复位键")
     if "CRITICAL" in ev_levels and not latched:
         add("规则引擎", "存在紧急事件", 100)
     elif "WARNING" in ev_levels:
         add("规则引擎", "存在警告事件", 40)
 
     if heating and present is False:
-        add("人员 × 传感器", "正在加热但台前无人", 70)
+        add("人员 × 传感器", "正在加热但台前无人", 70, "立即回到实验台，或关闭热源")
     if heating and d.get("sleeping"):
-        add("人员 × 传感器", "加热中人员疑似伏案", 70)
+        add("人员 × 传感器", "加热中人员疑似伏案", 70, "抬头确认加热状态，疲劳请先关闭热源")
     if d.get("eating") and (reagents or heating):
-        add("人员 × 器皿", "台面有试剂 / 正在加热时出现饮食行为", 60)
+        add("人员 × 器皿", "台面有试剂 / 正在加热时出现饮食行为", 60, "停止饮食，离开实验区洗手")
     elif d.get("eating"):
-        add("人员模型", "实验区饮食", 25)
+        add("人员模型", "实验区饮食", 25, "停止饮食，到实验区外进食")
 
     for k in missing:
         name = PPE_NAMES[k]
         if heating and k in ("ppe_goggles", "ppe_gloves"):
-            add("人员 × 传感器", f"加热中未佩戴{name}（飞溅 / 烫伤风险）", 35 if boiling else 30)
+            add("人员 × 传感器", f"加热中未佩戴{name}（飞溅 / 烫伤风险）", 35 if boiling else 30, f"佩戴{name}")
         elif items and k in ("ppe_goggles", "ppe_gloves", "ppe_coat"):
-            add("人员 × 器皿", f"台面有器皿时未佩戴{name}", 15)
+            add("人员 × 器皿", f"台面有器皿时未佩戴{name}", 15, f"佩戴{name}")
         else:
-            add("人员模型", f"未佩戴{name}", 8)
+            add("人员模型", f"未佩戴{name}", 8, f"佩戴{name}")
 
     if heating and non_heatable:
-        add("器皿 × 传感器", f"加热时台面有不可加热量器（{', '.join(non_heatable)}）", 35)
+        add("器皿 × 传感器", f"加热时台面有不可加热量器（{'、'.join(ITEM_NAMES.get(n, n) for n in non_heatable)}）", 35, "移出量器，改用烧杯或锥形瓶加热")
     if d.get("edge_risk"):
         add("器皿模型" if not heating else "器皿 × 传感器",
-            "器皿靠近桌边" + ("，且正在加热" if heating else ""), 35 if heating else 12)
+            "器皿靠近桌边" + ("，且正在加热" if heating else ""), 35 if heating else 12, "将器皿移至台面内侧")
     if heating and not heatable and present is not None and not items:
-        add("器皿 × 传感器", "在加热但台面未识别到器皿，请确认摄像头角度", 10)
+        add("器皿 × 传感器", "在加热但台面未识别到器皿，请确认摄像头角度", 10, "调整器皿位置，使其进入台面摄像头画面")
 
     if wm_risk >= 0.6:
-        add("温度预测", f"干烧风险分 {wm_risk:.2f}", 70)
+        add("温度预测", f"干烧风险分 {wm_risk:.2f}", 70, "立即降低火力或补充液体")
     elif wm_risk >= 0.3:
-        add("温度预测", f"干烧风险分 {wm_risk:.2f}", 30)
+        add("温度预测", f"干烧风险分 {wm_risk:.2f}", 30, "注意液面，必要时降低火力")
 
     score = min(100, sum(f["points"] for f in factors))
     level = "high" if score >= high_score else "mid" if score >= mid_score else "low"

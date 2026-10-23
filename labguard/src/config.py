@@ -55,7 +55,7 @@ DEFAULTS = {
     },
     "notify": {"webhook_url": "", "min_level": "WARNING"},
     "demo": {"allow_ipc_telemetry": True},
-    "ui": {"wave_fps": None, "kiosk_size": None},
+    "ui": {"wave_fps": None, "kiosk_size": None, "style": "standard"},
     "world_model": {"fit_window_s": 60.0, "boil_low_c": 92.0, "boil_high_c": 104.0, "boil_full_risk_s": 600.0},
     "web": {"enabled": True, "host": "0.0.0.0", "port": 8080, "token": "", "stream_fps": 6, "stream_width": 640},
     "agent": {
