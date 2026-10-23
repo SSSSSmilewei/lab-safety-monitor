@@ -85,6 +85,13 @@ class FakeMCU:
             self.fan_pwm, self.humid_on = payload[0], bool(payload[1])
             self.manual_until = time.time() + 600
 
+    def press_button(self):
+        """与固件 handleButton() 一致：长按控制键 2 秒，通电中 = 现场断电并锁定，否则 = 复位"""
+        if self.relay_on and not self.latched:
+            self._cut(5, 8)
+        else:
+            self.press_reset()
+
     def press_reset(self):
         blocked = self.obj_temp >= self.RESET_MAX_C or self.smoke >= self.RESET_SMOKE_MAX
         if blocked:

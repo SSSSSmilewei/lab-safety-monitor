@@ -10,7 +10,7 @@
 
 ## 2. 不可违反的设计约束（改代码前必读）
 
-1. **软件只能断电，不能通电。** 代码里不存在任何"通电 / 解锁继电器"的接口；恢复供电只能现场长按控制盒复位键，下位机复查温度和烟雾后才通电。`tests/test_platform.py` 会检查网页路由里没有 power/on、unlock、reset、release 之类的接口。
+1. **软件只能断电，不能通电。** 代码里不存在任何"通电 / 解锁继电器"的接口；恢复供电只能现场长按控制盒控制键 2 秒（复位），下位机复查温度和烟雾后才通电。`tests/test_platform.py` 会检查网页路由里没有 power/on、unlock、reset、release 之类的接口。
 2. **大模型不碰电闸。** 安全助手（`src/agent/`）的工具全部只读（`TOOLS` 里只有 get_status / get_recent_events / get_forecast / search_manual），测试会检查工具名里没有 power / relay / reset / unlock / cut。V-JEPA 2 和温度预测也只产生提醒，不参与断电。
 3. **安全判断不依赖任何界面。** 判断在 `src/core/engine.py` 的 `SafetyEngine` 里完成；小屏、电脑大窗口、网页大屏都只是显示和操作入口。不要把判断逻辑写回界面里。
 4. **下位机本地硬规则独立于开发板**：热源 ≥150℃、烟雾 ≥2500、30 秒收不到心跳且仍在加热 → 断电；上电时继电器默认断开。这些阈值写在固件里，网页上改不了；`config.yaml → hardware` 要和烧进固件的值一致，网页上的断电阈值只能设在它以下。现场复位时热源 ≥120℃ 或烟雾 ≥1800（与开发板默认断电阈值一致）会被拒绝。
@@ -62,7 +62,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
 | `tools/` | `center_demo.py` 总后台演示（示例楼栋与账号 + 模拟终端上报，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（75 项）、`test_platform.py`（44 项）、`test_center.py`（56 项，总后台 + 开发板接入）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tests/` | `test_backend.py`（80 项）、`test_platform.py`（44 项）、`test_center.py`（56 项，总后台 + 开发板接入）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）。有 `*_rknn_model/` 目录时优先用 NPU |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -123,11 +123,11 @@ ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp, humi, obj_t
 | 上→下 | 0x05 SET_ACT | [风扇 PWM 0–100, 加湿 0/1]，手动指令 10 分钟有效 |
 | 下→上 | 0x10 TELEMETRY | `<hHhHBB` 温度×10、湿度×10、热源×10、烟雾原始值、flags、断电原因；无效值 0x7FFF / 0xFFFF |
 | 下→上 | 0x11 ACK | [被确认的 SEQ, CMD, 结果] |
-| 下→上 | 0x12 EVENT | `<Bh` 事件码（1 超温断电、2 烟雾断电、3 看门狗断电、4 执行上位机断电、5 复位成功、6 复位被拒、7 启动）+ 数值 |
+| 下→上 | 0x12 EVENT | `<Bh` 事件码（1 超温断电、2 烟雾断电、3 看门狗断电、4 执行上位机断电、5 复位成功、6 复位被拒、7 启动、8 现场按键断电）+ 数值；断电原因码 5 = 现场按键 |
 | 下→上 | 0x13 ENV_STATUS | [风扇 PWM, 加湿, 模式] |
 
 flags：bit0 继电器闭合、bit1 锁定、bit2 心跳正常、bit3 SHT30 正常、bit4 MLX90614 正常、bit5 MQ-2 预热完成、bit6 本地危险。
-ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/13、蜂鸣器 14、复位键 4、DFPlayer RX 18 / TX 17、风扇 PWM 15、加湿 16。
+ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/13、蜂鸣器 14、控制键 4（长按 2 秒：通电中 = 现场断电并锁定，已断电 = 复位上电）、DFPlayer RX 18 / TX 17、风扇 PWM 15、加湿 16。
 
 ## 8. 开发板本机控制台接口（`src/web/server.py`，端口 `web.port`，本仓库 config.yaml 为 8180）
 
@@ -150,7 +150,7 @@ cd labguard
 pip install -r requirements.txt          # Python 3.10–3.12
 python run_app.py                          # 电脑大窗口 + 网页 http://127.0.0.1:8180
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
-python tests/test_backend.py               # 75 项，无需硬件
+python tests/test_backend.py               # 80 项，无需硬件
 python tests/test_platform.py              # 44 项，无需硬件和大模型
 python tests/test_center.py                # 56 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格、开发板 CenterLink 真实 HTTP 接入
 python run_center.py                       # 总后台 http://127.0.0.1:8200（首次启动打印 admin 初始密码）

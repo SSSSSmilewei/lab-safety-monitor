@@ -243,6 +243,23 @@ sm.evaluate([], False, 25.0, 55.0)
 check(not sm.latched, "上位机同步解除锁定")
 
 # ---------------------------------------------------------------------------
+print("[6c2] 控制键：通电中长按 2 秒现场断电，再长按 2 秒复位")
+mcu.press_button()
+check(wait_until(lambda: link.get_sensor_data()["latched"] and link.get_sensor_data()["cut_reason"] == 5),
+      "通电中长按控制键 → 下位机断电锁定，原因码 5")
+time.sleep(0.15)
+push_hw()
+sm.evaluate([], True, 25.0, 55.0)
+check(sm.latched and "现场按键断电" in sm.latch_reason, "上位机同步锁定，原因显示为现场按键断电")
+check(any("现场按键断电" in s for s in events.recent_lines(5)), "按键断电事件记入日志")
+mcu.press_button()
+check(wait_until(lambda: not link.get_sensor_data()["latched"]), "已断电时再长按 → 复位上电")
+time.sleep(0.15)
+push_hw()
+sm.evaluate([], True, 25.0, 55.0)
+check(not sm.latched, "上位机随之解除锁定")
+
+# ---------------------------------------------------------------------------
 print("[6d] 温湿度传感器掉线：不用旧数据，如实提醒")
 mcu.temp, mcu.humi = None, None
 check(wait_until(lambda: link.get_sensor_data()["temp"] is None), "遥测上报温湿度无效")

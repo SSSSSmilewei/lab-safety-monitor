@@ -47,6 +47,7 @@ CUT_REASON_TEXT = {
     2: "烟雾超标（下位机本地规则）",
     3: "上位机失联兜底（下位机看门狗）",
     4: "上位机联合决策",
+    5: "现场按键断电",
 }
 
 
@@ -128,7 +129,7 @@ class SafetyStateMachine(QObject):
                        level="CRITICAL", kind="power_off_fail")
         elif kind == "mcu_event":
             code = info.get("code")
-            level = "CRITICAL" if code in (1, 2, 3) else "INFO"
+            level = "CRITICAL" if code in (1, 2, 3) else "WARNING" if code == 8 else "INFO"
             events.log("下位机上报", info.get("desc", ""), level=level, kind="mcu_event")
             if code == 5:
                 self._field_reset_flag = True

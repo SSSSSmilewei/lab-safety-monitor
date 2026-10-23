@@ -7,7 +7,8 @@
  *   2. 通过 USB 串口向香橙派上报遥测，执行上位机的断电 / 语音指令
  *   3. 本地硬规则（不依赖上位机）：热源超温、烟雾超标 → 立即断电
  *   4. 看门狗：上位机心跳丢失 30 秒且仍在加热 → 断电兜底
- *   5. 断电后锁定：只有现场长按复位键才能恢复供电（上位机只能断电，不能上电）
+ *   5. 断电后锁定：只有现场长按复位键才能恢复供电（上位机只能断电，不能上电）；
+ *      同一个键在通电时长按 2 秒 = 现场断电（急停），已断电时长按 2 秒 = 复位上电
  *   6. 外部温湿度控制：排风扇（PWM 调速）+ 加湿雾化片，控制律在本地执行，断网也能工作；
  *      上位机只下发设定值（0x04）或 10 分钟有效的手动指令（0x05），状态用 0x13 上报。
  *      控制律与 src/core/env_control.py 的 control_law() 完全一致。
@@ -38,7 +39,7 @@ const int PIN_LED_R  = 11;
 const int PIN_LED_Y  = 12;
 const int PIN_LED_G  = 13;
 const int PIN_BUZZER = 14;   // 有源蜂鸣器模块（极性见 BUZZER_ACTIVE_HIGH）
-const int PIN_BTN    = 4;    // 复位 / 上电键（极性见 BTN_ACTIVE_HIGH）
+const int PIN_BTN    = 4;    // 控制键：长按 2 秒断电 / 复位上电（极性见 BTN_ACTIVE_HIGH）
 const int PIN_DF_RX  = 18;   // ESP32 RX ← DFPlayer TX
 const int PIN_DF_TX  = 17;   // ESP32 TX → 1kΩ → DFPlayer RX
 const int PIN_FAN    = 15;   // 排风扇：PWM → MOSFET 模块 → 5V 风扇
@@ -60,7 +61,7 @@ const uint32_t HB_LOST_MS       = 5000;   // 超过该时间无心跳 → 黄灯
 const uint32_t WATCHDOG_CUT_MS  = 30000;  // 失联超过该时间且仍在加热 → 断电
 const float    WATCHDOG_HOT_C   = 60.0;
 const uint32_t SENSOR_PERIOD_MS = 500;
-const uint32_t BTN_LONG_MS      = 1000;
+const uint32_t BTN_LONG_MS      = 2000;   // 长按 2 秒：通电中 = 现场断电并锁定；已断电 = 复位上电（先查温度和烟雾）
 const uint16_t SMOKE_FAN_RAW    = 1200;   // 烟雾达到该值：排风满速、禁止加湿
 const uint32_t MANUAL_MS        = 600000; // 手动指令有效期 10 分钟
 
@@ -72,9 +73,9 @@ const int16_t  INVALID_I16 = 0x7FFF;
 const uint16_t INVALID_U16 = 0xFFFF;
 
 // 断电原因 / 事件码（与 serial_comm.py 中 CUT_REASONS / EVENT_CODES 对应）
-enum { CUT_NONE = 0, CUT_OVERTEMP = 1, CUT_SMOKE = 2, CUT_WATCHDOG = 3, CUT_PC = 4 };
+enum { CUT_NONE = 0, CUT_OVERTEMP = 1, CUT_SMOKE = 2, CUT_WATCHDOG = 3, CUT_PC = 4, CUT_BUTTON = 5 };
 enum { EV_LOCAL_OVERTEMP = 1, EV_LOCAL_SMOKE = 2, EV_WATCHDOG = 3, EV_PC_CUT = 4,
-       EV_RESET_OK = 5, EV_RESET_REFUSED = 6, EV_BOOT = 7 };
+       EV_RESET_OK = 5, EV_RESET_REFUSED = 6, EV_BOOT = 7, EV_BUTTON_CUT = 8 };
 
 Adafruit_SHT31 sht;
 Adafruit_MLX90614 mlx;
@@ -287,8 +288,10 @@ void handleButton() {
   if (down && btnArmed) {
     if (btnDownAt == 0) { btnDownAt = millis(); btnHandled = false; }
     if (!btnHandled && millis() - btnDownAt >= BTN_LONG_MS) {
-      btnHandled = true;
-      if (resetBlocked()) {
+      btnHandled = true;     // 一次按下只动作一次：按住不放不会断电后又复位
+      if (relayOn && !latched) {
+        cutPower(CUT_BUTTON, EV_BUTTON_CUT);   // 通电中长按 = 现场急停，同样锁定，复电仍须再长按复位
+      } else if (resetBlocked()) {
         sendEvent(EV_RESET_REFUSED, 0);
         beep(5, 80);
       } else {
