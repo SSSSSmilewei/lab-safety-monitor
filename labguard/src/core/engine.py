@@ -27,8 +27,9 @@ from src.core.events import events, LEVEL_RANK
 from src.core.telemetry import telemetry
 from src.core.state_machine import SafetyStateMachine
 from src.core.world_model import PHASE_TEXT
+from src.core import cross_check
 from src.hardware.sensor_worker import SensorWorker
-from dual_inference import DualInferenceSystem
+from dual_inference import DualInferenceSystem, is_live_source
 from serial_comm import SerialComm
 
 STATE_TEXT = {"NORMAL": "正常守护", "WARNING": "警告", "CRITICAL": "紧急"}
@@ -90,6 +91,7 @@ class SafetyEngine(QObject):
         self.progress = (0, 0)
         self.fps_text = ""
         self.media_label = "摄像头"
+        self.risk: Dict[str, Any] = cross_check.assess({})
 
         self._lock = threading.Lock()
         self._frames = (None, None)
@@ -120,16 +122,60 @@ class SafetyEngine(QObject):
 
     # ------------------------------------------------------------------
     def _evaluate(self):
+        # 判断一律用遥测快照里的温湿度：传感器掉线时这里是 None，而不是最后一次的旧数值。
+        # self.current_temp / current_humi 只留给旧的电脑大窗口显示用
+        tel = telemetry.snapshot()
         state, _ = self.state_machine.evaluate(
             micro_detections=self.latest_chem_items,
             macro_unattended=self.latest_unattended,
-            current_temp=self.current_temp,
-            current_humi=self.current_humi,
+            current_temp=tel.get("temp"),
+            current_humi=tel.get("humi"),
         )
         return state
 
+    def _stop_demo_video_if_hw(self):
+        """接上下位机后，演示视频不能再进入真实的断电判断：自动切回摄像头"""
+        link = self.serial
+        if link is None or not getattr(link, "is_alive", False):
+            return
+        ds = self.dual_system
+        is_file = lambda s: s is not None and not is_live_source(s)
+        if not (is_file(ds.media_source1) or is_file(ds.media_source2)):
+            return
+        ds.load_media(src1=0, src2=0, force_reload=True)
+        self.media_label = "摄像头（config.yaml 机位）"
+        events.log("停止演示视频", "已接入下位机，真实数据优先，画面已切回摄像头", level="WARNING", kind="media")
+
+    def update_risk(self) -> Dict[str, Any]:
+        """交叉验证：人员模型 × 器皿模型 × 传感器 → 工况与低 / 中 / 高三级风险，并驱动信号灯"""
+        sm = self.state_machine
+        wm = sm.world_model.snapshot()
+        a = self.latest_alarms
+        active = events.active_events()
+        try:
+            risk = cross_check.assess({
+                "person_present": a.get("person_present") if a else None,
+                "ppe_missing": [k for k in cross_check.PPE_NAMES if events.is_active(k)],
+                "eating": events.is_active("eating"), "sleeping": events.is_active("sleeping"),
+                "edge_risk": events.is_active("edge_risk"),
+                "chem_items": list(a.get("chem_items", [])) if a else [],
+                "obj_temp": telemetry.get("obj_temp"), "heating": sm.heating,
+                "wm_phase": wm.get("phase"), "wm_risk": wm.get("risk"), "wm_eta_s": wm.get("eta_s"),
+                "latched": sm.latched,
+                "event_levels": [e.get("level") for e in active],
+            })
+        except Exception as e:   # 交叉验证出错不影响断电规则；灯光仍由事件等级保底
+            print(f"[Engine] 交叉验证异常: {e}")
+            return self.risk
+        risk["ts"] = time.time()
+        self.risk = risk
+        events.set_risk_light(risk["light"])
+        return risk
+
     def _on_tick(self):
+        self._stop_demo_video_if_hw()
         self._evaluate()
+        self.update_risk()
         for ext in list(self.extensions.values()):
             tick = getattr(ext, "tick", None)
             if tick is not None:
@@ -262,6 +308,7 @@ class SafetyEngine(QObject):
                 "media": self.media_label,
             },
             "world_model": wm,
+            "risk": self.risk,
             "active_events": [{k: e.get(k) for k in ("kind", "level", "title", "message", "time_str", "uid")}
                               for e in active if e.get("level") != "INFO"],
             "stats": events.stats(),
@@ -279,7 +326,7 @@ class SafetyEngine(QObject):
 
 
 def attach_extensions(engine: SafetyEngine, agent: bool = True) -> SafetyEngine:
-    """挂载可选模块：外部温湿度控制、演示注入、视觉世界模型回写、Agent。任何一个失败都不影响安全主循环"""
+    """挂载可选模块：外部温湿度控制、演示注入、视觉世界模型回写、Agent、总后台连接。任何一个失败都不影响安全主循环"""
     from src.core.env_control import EnvController
     from src.core.demo import DemoInjector
     from src.core.jepa_link import JepaLink
@@ -292,4 +339,7 @@ def attach_extensions(engine: SafetyEngine, agent: bool = True) -> SafetyEngine:
             engine.extensions["agent"] = SafetyAgent(engine)
         except Exception as e:
             print(f"[Engine] Agent 未启用: {e}")
+    # 最后挂载：总后台下发的问答参数要交给已经创建好的 Agent
+    from src.core.center_link import CenterLink
+    engine.extensions["center"] = CenterLink(engine)   # 未配置 center.url 时不启动线程
     return engine

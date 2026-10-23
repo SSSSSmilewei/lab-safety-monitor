@@ -221,6 +221,8 @@ check(snap["state"] in ("NORMAL", "WARNING", "CRITICAL") and "world_model" in sn
       "快照包含状态、世界模型、环境控制")
 r = client.patch("/api/config", headers=H, json={"rules.dry_burn_c": 999})
 check(r.status_code == 422, "越界参数被拒绝")
+r = client.patch("/api/config", headers=H, json={"rules.dry_burn_c": 146})
+check(r.status_code == 422, "干烧阈值不能超过控制盒硬上限（150℃ − 5）")
 r = client.patch("/api/config", headers=H, json={"serial.port": "/dev/evil"})
 check(r.status_code == 422, "白名单外参数被拒绝")
 r = client.patch("/api/config", headers=H, json={"rules.dry_burn_c": 130})
@@ -244,6 +246,8 @@ class AliveLink:
 engine.serial, saved = AliveLink(), engine.serial
 r = client.post("/api/demo/start", headers=H, json={"scenario": "smoke"})
 check(r.status_code == 409, "接入下位机后拒绝演示注入")
+r = client.post("/api/camera", headers=H, json={"mode": "video", "name": "demo.mp4"})
+check(r.status_code == 409, "接入下位机后拒绝播放演示视频")
 engine.serial = saved
 r = client.post("/api/env/setpoint", headers=H, json={"t_set": 50, "h_low": 40, "h_high": 70})
 check(r.status_code == 422, "环境设定值越界被拒绝")

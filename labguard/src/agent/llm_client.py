@@ -63,7 +63,8 @@ class Provider:
              model: Optional[str] = None, timeout: Optional[float] = None,
              max_tokens: int = 600) -> Dict[str, Any]:
         body: Dict[str, Any] = {"model": model or self.model, "messages": messages,
-                                "temperature": 0.3, "max_tokens": max_tokens, "stream": False}
+                                "temperature": float(cfg("agent.temperature", 0.3)), "max_tokens": max_tokens,
+                                "stream": False}
         if tools:
             body["tools"] = tools
         headers = {"Content-Type": "application/json"}

@@ -30,6 +30,7 @@ _cfg["voting"]["window_s"] = 0.5
 _cfg["voting"]["min_frames"] = 3
 _cfg["sleep"]["still_seconds"] = 0.5
 _cfg["notify"]["webhook_url"] = ""
+_cfg["serial"]["engine_stale_s"] = 1.0   # 安全判断停止 1 秒后停发心跳
 
 try:
     from PySide6.QtCore import QCoreApplication
@@ -125,7 +126,8 @@ def fake_open(self=link):
 link._try_open = fake_open
 link.connect()
 check(wait_until(lambda: link.is_alive), "链路建立，收到遥测")
-check(wait_until(lambda: mcu.last_hb > 0), "下位机收到心跳")
+time.sleep(0.3)
+check(mcu.last_hb == 0, "安全判断还没运行时不发心跳")
 
 sm = SafetyStateMachine(serial_controller=link)
 alerts.clear()
@@ -143,6 +145,7 @@ time.sleep(0.2)
 push_hw()
 state, _ = sm.evaluate(["Beaker"], False, 25.0, 55.0)
 check(state == "NORMAL", "热源 30℃ 正常")
+check(wait_until(lambda: mcu.last_hb > 0), "安全判断运行后，下位机收到心跳")
 
 mcu.obj_temp = 130.0
 wait_until(lambda: link.get_sensor_data()["obj_temp"] == 130.0)
@@ -202,6 +205,55 @@ time.sleep(0.15)
 push_hw()
 sm.evaluate([], False, 25.0, 55.0)
 check(not sm.latched, "复位后解除")
+
+# ---------------------------------------------------------------------------
+print("[6b] 心跳由安全判断驱动")
+sm.evaluate([], False, 25.0, 55.0)
+time.sleep(1.3)
+hb = mcu.last_hb
+time.sleep(1.2)
+check(mcu.last_hb == hb, "安全判断停止后心跳停发（下位机看门狗可以接管）")
+sm.evaluate([], False, 25.0, 55.0)
+check(wait_until(lambda: mcu.last_hb > hb), "安全判断恢复后心跳恢复")
+
+# ---------------------------------------------------------------------------
+print("[6c] 断电后不算加热；复位门槛与上位机一致")
+mcu.obj_temp = 130.0
+wait_until(lambda: link.get_sensor_data()["obj_temp"] == 130.0)
+push_hw()
+sm.evaluate([], False, 25.0, 55.0)
+check(wait_until(lambda: link.get_sensor_data()["latched"]), "130℃ 断电，继电器断开")
+mcu.obj_temp = 70.0
+wait_until(lambda: link.get_sensor_data()["obj_temp"] == 70.0)
+push_hw()
+sm.evaluate(["Beaker"], True, 25.0, 55.0)
+check(not events.is_active("unattended_heating"), "继电器已断开时，70℃ + 无人不再报加热无人")
+mcu.obj_temp = 125.0
+wait_until(lambda: link.get_sensor_data()["obj_temp"] == 125.0)
+mcu.press_reset()
+time.sleep(0.3)
+check(link.get_sensor_data()["latched"], "125℃（高于上位机干烧阈值）时复位被拒绝，不会先通电再被断电")
+mcu.obj_temp = 30.0
+mcu.press_reset()
+check(wait_until(lambda: not link.get_sensor_data()["latched"]), "降到 30℃ 后复位成功")
+time.sleep(0.15)
+push_hw()
+sm.evaluate([], False, 25.0, 55.0)
+sm.evaluate([], False, 25.0, 55.0)
+check(not sm.latched, "上位机同步解除锁定")
+
+# ---------------------------------------------------------------------------
+print("[6d] 温湿度传感器掉线：不用旧数据，如实提醒")
+mcu.temp, mcu.humi = None, None
+check(wait_until(lambda: link.get_sensor_data()["temp"] is None), "遥测上报温湿度无效")
+d = push_hw()
+state, _ = sm.evaluate([], False, d["temp"], d["humi"])
+check(events.is_active("env_sensor_fault") and not sm.latched, "提示温湿度传感器无数据，不断电")
+mcu.temp, mcu.humi = 25.0, 55.0
+wait_until(lambda: link.get_sensor_data()["temp"] == 25.0)
+d = push_hw()
+sm.evaluate([], False, d["temp"], d["humi"])
+check(not events.is_active("env_sensor_fault"), "传感器恢复后提醒解除")
 
 # ---------------------------------------------------------------------------
 print("[7] 下位机不回 ACK：断电失败如实上报，并持续重发")

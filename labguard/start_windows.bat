@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-rem 双击启动：电脑大窗口 + 网页大屏（浏览器打开 http://127.0.0.1:8080）
+rem 双击启动：电脑大窗口 + 网页大屏（浏览器打开 http://127.0.0.1:8180，端口在 config.yaml 的 web.port 修改）
 cd /d "%~dp0"
 python run_app.py %*
 if %errorlevel% neq 0 (

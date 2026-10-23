@@ -33,11 +33,24 @@ SYSTEM_PROMPT = (
     "你没有任何控制电源或设备的能力：断电由规则和硬件自动执行，恢复供电只能由人员在现场按复位键。"
     "回答要求：中文，简洁、具体、可执行；先给结论，再给处置步骤（不超过 3 步）；"
     "引用手册时写明条款编号；不要编造传感器没有给出的数据。"
+    "被问到「现在危险吗 / 处于什么状态 / 该怎么办」时，先调用 get_risk_assessment，"
+    "按「风险等级（低危 / 中危 / 高危）→ 当前工况 → 主要依据 → 处置步骤」回答；"
+    "风险等级以该工具的结果为准，不要自己另定等级。"
 )
+
+
+def system_prompt() -> str:
+    """基础提示词 + 本校补充要求（agent.extra_prompt，总后台可改，如本校实验室制度）"""
+    extra = str(cfg("agent.extra_prompt", "") or "").strip()
+    return SYSTEM_PROMPT + (f"\n本实验室补充要求：{extra[:500]}" if extra else "")
 
 TOOLS = [
     {"type": "function", "function": {
         "name": "get_status", "description": "获取系统当前状态：安全等级、遥测、视觉、断电锁定、世界模型预测",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "get_risk_assessment",
+        "description": "获取交叉验证结果：人员模型 × 器皿模型 × 传感器融合后的当前工况、风险等级（低危/中危/高危）和每条依据",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
         "name": "get_recent_events", "description": "获取最近的安全事件列表（新的在前）",
@@ -71,6 +84,14 @@ RULE_ADVICE = {
 PPE_ADVICE = ("人员防护装备不完整", ["立即补戴缺失的防护装备", "补戴前暂停操作"])
 
 # 不单独生成建议的事件：链路 / 静音等系统消息，以及"执行断电""断电锁定"这类伴随事件（建议写在引发断电的那条事件上）
+# 总后台可调的问答参数：键 → (类型, 最小值, 最大值 / 字符串最大长度)
+AGENT_PARAMS = {
+    "temperature": (float, 0.0, 1.0),
+    "max_tokens": (int, 200, 1500),
+    "min_level": (str, 0, 10),
+    "extra_prompt": (str, 0, 500),
+}
+
 SKIP_KINDS = {"mute", "link", "mcu_event", "power_reset", "vision_offline", "unattended", "config", "demo",
               "power_off", "power_latched", "power_off_ack", "power_off_fail", "model", "system"}
 
@@ -101,13 +122,17 @@ class SafetyAgent:
                 "vision": {k: s["vision"][k] for k in ("person_present", "unattended", "chem_items", "violations")},
                 "world_model": {k: s["world_model"].get(k) for k in ("phase_text", "temp", "eta_s", "t_inf",
                                                                       "plateau_s", "risk")},
-                "active_events": s["active_events"]}
+                "active_events": s["active_events"],
+                "risk": {k: s.get("risk", {}).get(k) for k in ("level_text", "scene", "score", "factors")}}
 
     def _call_tool(self, name: str, args: Dict[str, Any]) -> Any:
         if name not in TOOL_NAMES:
             return {"error": "没有这个工具"}
         if name == "get_status":
             return self._status_brief()
+        if name == "get_risk_assessment":
+            r = getattr(self.engine, "risk", None) or {}
+            return {k: r.get(k) for k in ("level_text", "scene", "score", "factors", "inputs")}
         if name == "get_recent_events":
             n = max(1, min(int(args.get("n", 10) or 10), 30))
             return [{k: e.get(k) for k in ("time_str", "level", "title", "message", "agent_note")}
@@ -126,16 +151,23 @@ class SafetyAgent:
         st.update({"busy": self.busy, "queued": self._q.qsize(), "reviews_done": self.reviews_done,
                    "auto_review": bool(cfg("agent.auto_review", True)),
                    "send_images_remote": bool(cfg("agent.send_images_remote", False)),
-                   "manual_entries": len(self.manual.docs), "log": list(self._log)[-8:]})
+                   "manual_entries": len(self.manual.docs), "log": list(self._log)[-8:],
+                   "params": {k: cfg(f"agent.{k}") for k in AGENT_PARAMS},
+                   # 如实说明：问答由通用大模型完成，靠本地安全手册检索 + 实时数据只读工具 + 专用提示词约束；
+                   # 视觉的两个 YOLO 模型才是用实验室数据训练过的
+                   "basis": ["实验室安全手册检索（{} 条）".format(len(self.manual.docs)),
+                             "实时数据只读工具：状态 / 交叉验证 / 事件 / 温度预测",
+                             "专用提示词（只建议、不控制设备）"]})
         return st
 
     def ask(self, question: str, history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
-        msgs = [{"role": "system", "content": SYSTEM_PROMPT}]
+        msgs = [{"role": "system", "content": system_prompt()}]
         for h in (history or [])[-6:]:
             if h.get("role") in ("user", "assistant") and isinstance(h.get("content"), str):
                 msgs.append({"role": h["role"], "content": h["content"][:1000]})
         msgs.append({"role": "user", "content": question[:1000]})
-        return self._run(msgs, fallback=lambda: self._rule_answer(question))
+        return self._run(msgs, fallback=lambda: self._rule_answer(question),
+                         max_tokens=int(cfg("agent.max_tokens", 600)))
 
     def review_event(self, uid: str) -> Optional[str]:
         ev = events.get_event(uid)
@@ -148,7 +180,7 @@ class SafetyAgent:
         prompt = ("请对下面这条安全事件做研判，输出 3 行：\n"
                   "原因：（一句话）\n处置：（1-3 步，用；分隔）\n依据：（手册条款编号与标题）\n\n"
                   + json.dumps(ctx, ensure_ascii=False, default=str))
-        msgs = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+        msgs = [{"role": "system", "content": system_prompt()}, {"role": "user", "content": prompt}]
         res = self._run(msgs, fallback=lambda: self._rule_review(ev), use_tools=False,
                         image_b64=self._event_image(ev))
         text = res["text"].strip()
@@ -168,7 +200,7 @@ class SafetyAgent:
         prompt = ("请根据以下数据写一份《实验安全报告》，结构：一、总体结论；二、主要风险事件（按严重程度）；"
                   "三、处置情况；四、改进建议（引用手册条款）。300 字以内。\n\n"
                   + json.dumps(ctx, ensure_ascii=False, default=str))
-        msgs = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+        msgs = [{"role": "system", "content": system_prompt()}, {"role": "user", "content": prompt}]
         return self._run(msgs, fallback=lambda: self._rule_report(hist, st), use_tools=False, max_tokens=900)
 
     def configure(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -186,6 +218,27 @@ class SafetyAgent:
         for key in ("auto_review", "send_images_remote"):
             if isinstance(data.get(key), bool):
                 set_value(f"agent.{key}", data[key])
+        params = data.get("params") or {}
+        errors = {}
+        for key, (typ, lo, hi) in AGENT_PARAMS.items():
+            if key not in params:
+                continue
+            try:
+                v = typ(params[key])
+            except (TypeError, ValueError):
+                errors[key] = "类型错误"
+                continue
+            if typ is str:
+                v = v.strip()[: int(hi)]
+                if key == "min_level" and v not in ("NOTICE", "WARNING", "CRITICAL"):
+                    errors[key] = "只能是 NOTICE / WARNING / CRITICAL"
+                    continue
+            elif not (lo <= v <= hi):
+                errors[key] = f"取值需在 {lo}–{hi}"
+                continue
+            set_value(f"agent.{key}", v)
+        if errors:
+            raise ValueError(errors)
         return self.status()
 
     # ------------------------------------------------------------------
@@ -258,6 +311,10 @@ class SafetyAgent:
         refs = self.manual.search(question, 2)
         s = self._status_brief()
         head = f"当前状态：{s.get('state_text', '未知')}。" if s else ""
+        r = getattr(self.engine, "risk", None) or {}
+        if r.get("level_text"):
+            reasons = "；".join(f["text"] for f in (r.get("factors") or [])[:3]) or "各项数据正常"
+            head = f"风险等级：{r['level_text']}（{r.get('scene', '')}）。依据：{reasons}。" + head
         if not refs:
             return head + "（大模型不可用，规则模板未找到相关手册条款）"
         return head + "相关手册条款：\n" + "\n".join(f"· {d['title']}：{d['text'][:120]}" for d in refs)

@@ -26,28 +26,12 @@ from fastapi.staticfiles import StaticFiles
 
 from src.config import cfg, set_value, resolve_path, PROJECT_ROOT
 from src.core.events import events
+from src.core.tunable import tunable_spec, validate as validate_tunable, label as tunable_label
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 FONT_PATH = os.path.join(PROJECT_ROOT, "LabSafetyMonitor", "Zpix.ttf")
 
-# 可在总后台调整的参数：路径 → (类型, 最小值, 最大值, 说明)
-TUNABLE = {
-    "rules.heating_on_c": (float, 30, 100, "判定为正在加热的热源温度 ℃"),
-    "rules.dry_burn_c": (float, 80, 200, "干烧断电阈值 ℃"),
-    "rules.rate_c_per_s": (float, 0.2, 10, "升温异常速率 ℃/s"),
-    "rules.rate_min_c": (float, 40, 150, "升温异常最低温度 ℃"),
-    "rules.unattended_heating_cut_s": (float, 10, 600, "加热无人值守断电时限 s"),
-    "rules.predict_eta_warn_s": (float, 10, 600, "预测干烧提前预警 s"),
-    "rules.boil_unattended_warn_s": (float, 30, 3600, "沸腾无人看守预警 s"),
-    "rules.smoke_raw": (int, 300, 4000, "烟雾断电阈值（MQ-2 原始值）"),
-    "rules.humidity_high": (float, 50, 95, "高湿告警 %"),
-    "rules.ambient_high_c": (float, 28, 60, "环境高温告警 ℃"),
-    "presence.absent_seconds": (float, 3, 120, "判定无人值守所需时长 s"),
-    "voting.on_ratio": (float, 0.3, 1.0, "违规确认帧占比"),
-    "events.reminder_s": (float, 0, 600, "违规持续时重复语音间隔 s（0 = 不重复）"),
-    "vision.conf": (float, 0.1, 0.9, "检测置信度阈值"),
-    "vision.iou": (float, 0.1, 0.9, "NMS IoU 阈值"),
-}
+# 可调参数白名单与校验见 src/core/tunable.py（总后台下发阈值时用同一套校验）
 
 
 def web_token() -> str:
@@ -80,6 +64,15 @@ def create_app(engine) -> FastAPI:
         got = request.headers.get("x-token") or request.query_params.get("token") or ""
         if not secrets.compare_digest(got, token):
             raise HTTPException(401, "口令错误")
+
+    def auth_or_center(request: Request):
+        """总后台凭它下发的访问密钥调用：只开放画面、快照与安全助手问答，不开放任何写配置 / 控制接口"""
+        link = ext.get("center")
+        key = getattr(link, "center_key", "") if link is not None else ""
+        got = request.headers.get("x-center-key") or ""
+        if key and got and secrets.compare_digest(got, key):
+            return
+        auth(request)
 
     ext = engine.extensions
 
@@ -114,7 +107,7 @@ def create_app(engine) -> FastAPI:
         return {"ok": True, "ts": time.time()}
 
     # ---------------- 只读 ----------------
-    @app.get("/api/snapshot", dependencies=[Depends(auth)])
+    @app.get("/api/snapshot", dependencies=[Depends(auth_or_center)])
     def snapshot():
         return JSONResponse(engine.snapshot())
 
@@ -132,7 +125,7 @@ def create_app(engine) -> FastAPI:
 
     @app.get("/api/config", dependencies=[Depends(auth)])
     def get_config():
-        return {k: {"value": cfg(k), "min": v[1], "max": v[2], "label": v[3]} for k, v in TUNABLE.items()}
+        return {k: {"value": cfg(k), "min": v[1], "max": v[2], "label": v[3]} for k, v in tunable_spec().items()}
 
     @app.get("/api/models", dependencies=[Depends(auth)])
     def list_models():
@@ -175,7 +168,7 @@ def create_app(engine) -> FastAPI:
 
         return StreamingResponse(gen(), media_type="multipart/x-mixed-replace; boundary=frame")
 
-    @app.get("/api/frame/{which}.jpg", dependencies=[Depends(auth)])
+    @app.get("/api/frame/{which}.jpg", dependencies=[Depends(auth_or_center)])
     def frame(which: str):
         data = engine.latest_jpeg(which if which in ("pano", "desk") else "pano")
         if not data:
@@ -202,29 +195,7 @@ def create_app(engine) -> FastAPI:
     @app.patch("/api/config", dependencies=[Depends(auth)])
     async def patch_config(request: Request):
         data = await body(request)
-        changed, errors = {}, {}
-        for key, val in data.items():
-            spec = TUNABLE.get(key)
-            if spec is None:
-                errors[key] = "不允许修改"
-                continue
-            typ, lo, hi, _ = spec
-            try:
-                v = typ(val)
-            except (TypeError, ValueError):
-                errors[key] = "类型错误"
-                continue
-            if not (lo <= v <= hi):
-                errors[key] = f"取值需在 {lo}–{hi}"
-                continue
-            changed[key] = v
-        # 逻辑约束：干烧阈值必须高于"正在加热"阈值
-        dry = changed.get("rules.dry_burn_c", cfg("rules.dry_burn_c"))
-        heat = changed.get("rules.heating_on_c", cfg("rules.heating_on_c"))
-        if float(dry) <= float(heat) + 10:
-            errors["rules.dry_burn_c"] = "干烧阈值必须比加热阈值高 10℃ 以上"
-            changed.pop("rules.dry_burn_c", None)
-            changed.pop("rules.heating_on_c", None)
+        changed, errors = validate_tunable(data, {k: cfg(k) for k in ("rules.dry_burn_c", "rules.heating_on_c")})
         if errors:
             raise HTTPException(422, {"errors": errors})
         for k, v in changed.items():
@@ -233,7 +204,7 @@ def create_app(engine) -> FastAPI:
             ds = engine.dual_system
             ds.set_config(ds.camera_mode, ds.enable_ppe, ds.enable_chem,
                           float(cfg("vision.conf")), float(cfg("vision.iou")), ds.img_size)
-        events.log("参数已调整", "，".join(f"{TUNABLE[k][3]}={v}" for k, v in changed.items()), kind="config")
+        events.log("参数已调整", "，".join(f"{tunable_label(k)}={v}" for k, v in changed.items()), kind="config")
         return {"changed": changed}
 
     @app.post("/api/model", dependencies=[Depends(auth)])
@@ -276,6 +247,8 @@ def create_app(engine) -> FastAPI:
             ds.load_media(src1=src(data.get("pano", 0)), src2=src(data.get("desk", 0)))
             engine.media_label = f"网络 / 外接摄像头"
         elif mode == "video":
+            if getattr(engine.serial, "is_alive", False):
+                raise HTTPException(409, "已接入下位机，真实数据优先，不能播放演示视频")
             name = os.path.basename(str(data.get("name", "")))
             repo = os.path.dirname(PROJECT_ROOT)
             path = next((p for p in (os.path.join(resolve_path("media"), name),
@@ -329,14 +302,17 @@ def create_app(engine) -> FastAPI:
 
     @app.post("/api/agent/config", dependencies=[Depends(auth)])
     async def agent_config(request: Request):
-        return need("agent").configure(await body(request))
+        try:
+            return need("agent").configure(await body(request))
+        except ValueError as e:
+            raise HTTPException(422, {"errors": e.args[0] if e.args else str(e)})
 
     @app.post("/api/agent/test", dependencies=[Depends(auth)])
     async def agent_test(request: Request):
         data = await body(request)
         return await asyncio.to_thread(need("agent").llm.test, str(data.get("route", "remote")))
 
-    @app.post("/api/agent/ask", dependencies=[Depends(auth)])
+    @app.post("/api/agent/ask", dependencies=[Depends(auth_or_center)])
     async def agent_ask(request: Request):
         data = await body(request)
         q = str(data.get("question", "")).strip()
@@ -345,7 +321,7 @@ def create_app(engine) -> FastAPI:
         hist = data.get("history") if isinstance(data.get("history"), list) else []
         return await asyncio.to_thread(need("agent").ask, q, hist)
 
-    @app.post("/api/agent/report", dependencies=[Depends(auth)])
+    @app.post("/api/agent/report", dependencies=[Depends(auth_or_center)])
     async def agent_report():
         return await asyncio.to_thread(need("agent").report)
 

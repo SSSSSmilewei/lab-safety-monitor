@@ -25,6 +25,7 @@ from src.config import cfg, resolve_path
 
 LEVEL_RANK = {"INFO": 0, "NOTICE": 1, "WARNING": 2, "CRITICAL": 3}
 LEVEL_LIGHT = {"INFO": 0, "NOTICE": 1, "WARNING": 1, "CRITICAL": 2}
+LEVEL_LIGHT_FLOOR = {"INFO": 0, "NOTICE": 0, "WARNING": 1, "CRITICAL": 2}   # 事件对灯光的最低要求
 LEVEL_TAG = {"INFO": "信息", "NOTICE": "提醒", "WARNING": "警告", "CRITICAL": "紧急"}
 
 
@@ -116,7 +117,7 @@ class EventCenter:
                 reminder_s = float(cfg("events.reminder_s", 30.0))
                 if reminder_s > 0 and now - cur["last_remind"] >= reminder_s:
                     cur["last_remind"] = now
-                    self._play_voice(kind)
+                    self._play_voice(kind, cur["level"])
                 return None
             if not active and cur is not None:
                 del self._active[kind]
@@ -237,21 +238,29 @@ class EventCenter:
     # 干预动作
     # ------------------------------------------------------------------
     def _act_on_start(self, ev: dict):
-        self._play_voice(ev["kind"])
+        self._play_voice(ev["kind"], ev["level"])
         self._notify_webhook(ev)
 
-    def _play_voice(self, kind: str):
+    def _play_voice(self, kind: str, level: str = "NOTICE"):
         if time.time() < self.mute_until:
             return
-        track = (cfg("events.voice", {}) or {}).get(kind)
-        link = _serial()
-        if track and link is not None:
-            link.play_voice(int(track))
+        # 语气跟着风险走：紧急事件或交叉验证为高危时用严厉语气，其余温和提醒
+        stern = level == "CRITICAL" or getattr(self, "_risk_light", 0) >= 2
+        from src.core.voice import voice
+        voice.play(kind, "stern" if stern else "gentle", _serial())
+
+    def set_risk_light(self, level: int):
+        """交叉验证（src/core/cross_check.py）给出的灯光等级：低危绿 / 中危黄 / 高危红"""
+        with self._lock:
+            self._risk_light = max(0, min(2, int(level)))
+            self._refresh_light()
 
     def _refresh_light(self):
-        level = 0
+        # 灯光 = max(交叉验证风险等级, 事件等级下限)。提醒类（NOTICE）事件的亮灯程度交给交叉验证决定，
+        # 警告 / 紧急事件保证至少黄 / 红灯，交叉验证出错时灯光也不会变弱
+        level = getattr(self, "_risk_light", 0)
         for ev in self._active.values():
-            level = max(level, LEVEL_LIGHT.get(ev["level"], 0))
+            level = max(level, LEVEL_LIGHT_FLOOR.get(ev["level"], 0))
         if level != self._light_level:
             self._light_level = level
             link = _serial()

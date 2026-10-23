@@ -37,18 +37,24 @@ const int PIN_RELAY  = 10;
 const int PIN_LED_R  = 11;
 const int PIN_LED_Y  = 12;
 const int PIN_LED_G  = 13;
-const int PIN_BUZZER = 14;   // 有源蜂鸣器（经三极管驱动）
-const int PIN_BTN    = 4;    // 复位 / 上电键，按下接地
+const int PIN_BUZZER = 14;   // 有源蜂鸣器模块（极性见 BUZZER_ACTIVE_HIGH）
+const int PIN_BTN    = 4;    // 复位 / 上电键（极性见 BTN_ACTIVE_HIGH）
 const int PIN_DF_RX  = 18;   // ESP32 RX ← DFPlayer TX
 const int PIN_DF_TX  = 17;   // ESP32 TX → 1kΩ → DFPlayer RX
 const int PIN_FAN    = 15;   // 排风扇：PWM → MOSFET 模块 → 5V 风扇
 const int PIN_HUMID  = 16;   // 加湿雾化片：MOSFET 模块开关
 
-const bool RELAY_ACTIVE_HIGH = true;   // 低电平触发的继电器模块改为 false
+const bool RELAY_ACTIVE_HIGH = true;   // 本队继电器模块 CW-025：跳线帽插 H（高电平触发），主控断电 / 重启时继电器保持断开
+const bool BUZZER_ACTIVE_HIGH = false; // 本队蜂鸣器模块 MH-FMD 为低电平触发（板上丝印注明）
+const bool BTN_ACTIVE_HIGH   = true;   // 本队 3 针按键模块：按下输出高电平、松开输出低电平；裸按键（按下接地）改为 false
 
 // ------------------------------- 阈值 -------------------------------
 const float    HARD_LIMIT_C     = 150.0;  // 本地硬上限，高于上位机的干烧阈值（120℃），作为最后防线
 const uint16_t SMOKE_LIMIT_RAW  = 2500;   // 本地烟雾硬上限（上位机预警阈值更低）
+// 复位门槛：与上位机 rules.dry_burn_c / rules.smoke_raw 的默认值一致。
+// 高于它们时拒绝复位，否则会先通电、上位机随即又断电，继电器来回开关
+const float    RESET_MAX_C      = 120.0;
+const uint16_t RESET_SMOKE_MAX  = 1800;
 const uint32_t MQ2_WARMUP_MS    = 60000;  // MQ-2 上电预热时间
 const uint32_t HB_LOST_MS       = 5000;   // 超过该时间无心跳 → 黄灯闪烁提示失联
 const uint32_t WATCHDOG_CUT_MS  = 30000;  // 失联超过该时间且仍在加热 → 断电
@@ -82,6 +88,7 @@ uint8_t cutReason = CUT_NONE;
 uint8_t alertLevel = 0, prevAlertLevel = 0;
 uint32_t lastHb = 0, lastSensor = 0, btnDownAt = 0;
 bool btnHandled = false;
+bool btnArmed = false;   // 上电后必须先见到一次"松开"才接受长按：接反、卡键时不会开机自动通电
 uint8_t txSeq = 0;
 
 // 外部温湿度控制
@@ -117,10 +124,14 @@ void sendEvent(uint8_t code, int16_t value) {
   sendFrame(MSG_EVENT, p, 3);
 }
 
+void setBuzzer(bool on) {
+  digitalWrite(PIN_BUZZER, (on == BUZZER_ACTIVE_HIGH) ? HIGH : LOW);
+}
+
 void beep(int times, int ms) {
   for (int i = 0; i < times; i++) {
-    digitalWrite(PIN_BUZZER, HIGH); delay(ms);
-    digitalWrite(PIN_BUZZER, LOW);  if (i + 1 < times) delay(ms);
+    setBuzzer(true);  delay(ms);
+    setBuzzer(false); if (i + 1 < times) delay(ms);
   }
 }
 
@@ -134,6 +145,13 @@ bool smokeReady() { return millis() > MQ2_WARMUP_MS; }
 bool localHazard() {
   bool hot = mlxOk && !isnan(objC) && objC >= HARD_LIMIT_C;
   bool smoke = smokeReady() && smokeRaw >= SMOKE_LIMIT_RAW;
+  return hot || smoke;
+}
+
+bool resetBlocked() {
+  if (localHazard()) return true;
+  bool hot = mlxOk && !isnan(objC) && objC >= RESET_MAX_C;
+  bool smoke = smokeReady() && smokeRaw >= RESET_SMOKE_MAX;
   return hot || smoke;
 }
 
@@ -154,9 +172,12 @@ void handleFrame(uint8_t seq, uint8_t cmd, const uint8_t *p, uint8_t len) {
     lastHb = millis();
     alertLevel = p[0] > 2 ? 2 : p[0];
   } else if (cmd == CMD_POWER_OFF) {
-    cutPower(CUT_PC, EV_PC_CUT);
+    // 先断开继电器并回 ACK，再锁定 / 上报 / 鸣叫：鸣叫会阻塞约 0.7 秒，
+    // 若先鸣叫，上位机 0.25 秒等不到 ACK 就会重发，甚至误报"断电未确认"
+    setRelay(false);
     uint8_t ack[3] = { seq, cmd, 0 };
     sendFrame(MSG_ACK, ack, 3);
+    cutPower(CUT_PC, EV_PC_CUT);
   } else if (cmd == CMD_PLAY_VOICE && len >= 1) {
     if (dfOk) df.playMp3Folder(p[0]);   // 播放 TF 卡 /mp3/000N.mp3（按文件名，不受拷贝顺序影响）
   } else if (cmd == CMD_SET_ENV && len >= 5) {
@@ -261,12 +282,13 @@ void envControl() {
 
 // ------------------------------- 按键与指示 -------------------------------
 void handleButton() {
-  bool down = digitalRead(PIN_BTN) == LOW;
-  if (down) {
+  bool down = digitalRead(PIN_BTN) == (BTN_ACTIVE_HIGH ? HIGH : LOW);
+  if (!down) btnArmed = true;
+  if (down && btnArmed) {
     if (btnDownAt == 0) { btnDownAt = millis(); btnHandled = false; }
     if (!btnHandled && millis() - btnDownAt >= BTN_LONG_MS) {
       btnHandled = true;
-      if (localHazard()) {
+      if (resetBlocked()) {
         sendEvent(EV_RESET_REFUSED, 0);
         beep(5, 80);
       } else {
@@ -288,9 +310,9 @@ void updateIndicators() {
   bool r = false, y = false, g = false;
   if (latched) {
     r = true;
-    digitalWrite(PIN_BUZZER, (now % 2000) < 150 ? HIGH : LOW);   // 锁定期间每 2 秒短鸣一次
+    setBuzzer((now % 2000) < 150);   // 锁定期间每 2 秒短鸣一次
   } else {
-    digitalWrite(PIN_BUZZER, LOW);
+    setBuzzer(false);
     if (now - lastHb > HB_LOST_MS) y = (now / 500) % 2;           // 上位机失联：黄灯闪烁
     else if (alertLevel == 2) r = true;
     else if (alertLevel == 1) y = true;
@@ -309,7 +331,8 @@ void setup() {
   setRelay(false);                       // 上电默认断开：失效安全
   pinMode(PIN_LED_R, OUTPUT); pinMode(PIN_LED_Y, OUTPUT); pinMode(PIN_LED_G, OUTPUT);
   pinMode(PIN_BUZZER, OUTPUT);
-  pinMode(PIN_BTN, INPUT_PULLUP);
+  setBuzzer(false);
+  pinMode(PIN_BTN, BTN_ACTIVE_HIGH ? INPUT_PULLDOWN : INPUT_PULLUP);   // 线松脱时读到"松开"
   pinMode(PIN_FAN, OUTPUT);   analogWrite(PIN_FAN, 0);
   pinMode(PIN_HUMID, OUTPUT); digitalWrite(PIN_HUMID, LOW);
   analogReadResolution(12);

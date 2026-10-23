@@ -9,6 +9,24 @@ serial:
   port: auto            # auto = 自动识别（优先 /dev/labguard 软链接）；也可写 /dev/ttyACM0、COM5
   baudrate: 115200
   heartbeat_s: 1.0      # 心跳周期；下位机超过 30 秒收不到心跳会进入兜底保护
+  engine_stale_s: 5.0   # 安全判断超过这么多秒没运行（程序卡死），就停发心跳，交给下位机看门狗
+
+# ---- 语音输出 ----
+voice:
+  output: dfplayer      # dfplayer = 控制盒 TF 卡（曲目号见 events.voice）；local = 开发板扬声器播放总后台下发的语音包；both = 两者都放
+
+# ---- 接入总后台（多实验室管理，可选）----
+# 在总后台「节点管理」里登记这张实验桌后，把给出的地址和节点密钥填到这里；留空 = 不接入，单机照常工作
+center:
+  url: ""               # 如 http://192.168.1.10:8200
+  node_token: ""        # 节点密钥（只用于这张实验桌与总后台之间；也可用环境变量 LABGUARD_NODE_TOKEN）
+  report_s: 2.0         # 上报间隔 s
+
+# ---- 本控制盒的硬上限（必须与烧进固件的值一致；网页上改不了）----
+# 高温实验室换用高量程测温仪时，固件和这里一起改大；开发板的断电阈值只能设在硬上限以下
+hardware:
+  hard_limit_c: 150     # 固件 HARD_LIMIT_C：热源超过就由下位机本地断电
+  smoke_limit_raw: 2500 # 固件 SMOKE_LIMIT_RAW：烟雾超过就由下位机本地断电
 
 # ---- 摄像头 ----
 camera:
@@ -111,7 +129,7 @@ world_model:
 web:
   enabled: true
   host: 0.0.0.0         # 0.0.0.0 = 局域网内其他电脑也能打开
-  port: 8080
+  port: 8180            # 默认 8080 与 Dify 的 nginx 冲突，本机已改用 8180
   token: ""             # 登录口令；留空 = 首次启动自动生成，保存在 runtime/web_token.txt，小屏「设置」页可查看
   stream_fps: 6         # 网页画面帧率（越低越省 CPU）
   stream_width: 640
@@ -123,6 +141,9 @@ agent:
   min_level: WARNING
   timeout_s: 20
   send_images_remote: false   # 是否把事件截图发给远程 API（默认不发，保护隐私）
+  temperature: 0.3      # 回答的发散程度，0–1；安全建议建议保持低值
+  max_tokens: 600       # 单次回答最大长度
+  extra_prompt: ""      # 本实验室的补充要求（如本校制度），会加在提示词末尾，最多 500 字
   remote:               # 远程 API：默认通义千问（OpenAI 兼容接口）
     base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
     api_key_env: DASHSCOPE_API_KEY   # Key 放在这个环境变量里，不要写进本文件

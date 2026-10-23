@@ -24,7 +24,7 @@ hub/jepa_worker.py
 国内网络可先设置镜像：set HF_ENDPOINT=https://hf-mirror.com
 
 用法：
-  python hub/jepa_worker.py --board http://192.168.1.50:8080 --token 口令
+  python hub/jepa_worker.py --board http://192.168.1.50:8180 --token 口令
   python hub/jepa_worker.py --selftest      # 不下载模型，用随机小模型检查整个流程
 """
 import argparse
@@ -224,7 +224,7 @@ def selftest():
 
 def main():
     ap = argparse.ArgumentParser(description="V-JEPA 2 画面异常检测（电脑端）")
-    ap.add_argument("--board", default="http://127.0.0.1:8080", help="开发板网页地址")
+    ap.add_argument("--board", default="http://127.0.0.1:8180", help="开发板网页地址")
     ap.add_argument("--token", default=os.environ.get("LABGUARD_TOKEN", ""), help="网页口令（小屏「设置」页）")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--device", default=None, help="cuda / cpu，默认自动")

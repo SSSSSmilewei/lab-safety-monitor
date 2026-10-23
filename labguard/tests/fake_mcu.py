@@ -15,6 +15,8 @@ class FakeMCU:
     """实现 pyserial 对象中 SerialComm 用到的部分：read / write / close / is_open"""
 
     HARD_LIMIT_C = 150.0
+    RESET_MAX_C = 120.0        # 与固件 RESET_MAX_C / RESET_SMOKE_MAX 一致
+    RESET_SMOKE_MAX = 1800
 
     def __init__(self):
         self.is_open = True
@@ -84,8 +86,8 @@ class FakeMCU:
             self.manual_until = time.time() + 600
 
     def press_reset(self):
-        hazard = self.obj_temp >= self.HARD_LIMIT_C
-        if hazard:
+        blocked = self.obj_temp >= self.RESET_MAX_C or self.smoke >= self.RESET_SMOKE_MAX
+        if blocked:
             self._send(MSG_EVENT, struct.pack("<Bh", 6, 0))
             return
         self.latched = False
@@ -101,7 +103,10 @@ class FakeMCU:
             self._last_tel = now
             flags = (self.relay_on << 0) | (self.latched << 1) | ((now - self.last_hb < 5) << 2) \
                 | (1 << 3) | (1 << 4) | (1 << 5)
-            payload = struct.pack("<hHhHBB", int(self.temp * 10), int(self.humi * 10),
+            # temp / humi 设为 None 模拟 SHT30 掉线（按协议上报无效值）
+            t10 = 0x7FFF if self.temp is None else int(self.temp * 10)
+            h10 = 0xFFFF if self.humi is None else int(self.humi * 10)
+            payload = struct.pack("<hHhHBB", t10, h10,
                                   int(self.obj_temp * 10), int(self.smoke), flags, self.cut_reason)
             self._send(MSG_TELEMETRY, payload)
             if time.time() >= self.manual_until:

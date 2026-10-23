@@ -78,6 +78,7 @@ class SafetyStateMachine(QObject):
     HAZARD_KINDS = (
         "dry_burn", "temp_rate", "unattended_heating", "dry_burn_fallback",
         "smoke", "humidity_high", "ambient_high", "non_heatable_heating", "dry_burn_predict",
+        "env_sensor_fault",
     )
 
     def __init__(self, serial_controller=None, parent=None):
@@ -87,6 +88,7 @@ class SafetyStateMachine(QObject):
 
         self.current_state = "NORMAL"
         self.latched = False
+        self.heating = False
         self.latch_reason = ""
         self.latch_since = 0.0
         self.last_power_off_time = 0.0
@@ -203,7 +205,11 @@ class SafetyStateMachine(QObject):
         recent_items = [k for k, t in self._item_seen.items() if now - t <= hold]
         heatable = self._match(recent_items, self.heating_keywords)
         non_heatable = self._match(recent_items, self.NON_HEATABLE_VESSELS)
-        heating = obj_temp is not None and obj_temp >= rules("heating_on_c", 50.0)
+        hw = self._hw()
+        # 接着下位机且继电器已断开时，热源只是在降温，不算"正在加热"（否则断电后还会继续报加热无人）
+        heating = (obj_temp is not None and obj_temp >= rules("heating_on_c", 50.0)
+                   and (hw is None or bool(hw.get("relay_on"))))
+        self.heating = heating   # 供交叉验证读取
 
         hazards: Dict[str, Dict[str, Any]] = {}
 
@@ -256,7 +262,8 @@ class SafetyStateMachine(QObject):
 
         # R4 兜底规则：没有热源测温时，沿用"器皿 + 无人值守 + 环境高温"
         fallback_c = rules("fallback_ambient_cut_c", 55.0)
-        if obj_temp is None and heatable and macro_unattended and current_temp > fallback_c:
+        if (obj_temp is None and heatable and macro_unattended
+                and current_temp is not None and current_temp > fallback_c):
             add("dry_burn_fallback", "CRITICAL", "疑似干烧（环境温度兜底）",
                 f"台面有 {', '.join(heatable)}，无人值守，环境温度 {current_temp:.1f}℃ > {fallback_c:.0f}℃"
                 f"（未接入热源测温，使用兜底规则）",
@@ -285,10 +292,14 @@ class SafetyStateMachine(QObject):
             add("non_heatable_heating", "NOTICE", "加热中台面出现量器",
                 f"检测到 {', '.join(non_heatable)}：量器不可直接加热，请确认")
 
+        # 温湿度传感器无数据：如实提醒，不再拿旧数值做判断
+        if hw is not None and (current_temp is None or current_humi is None):
+            add("env_sensor_fault", "WARNING", "温湿度传感器无数据",
+                "控制盒未读到 SHT30 温湿度，环境高温 / 高湿规则暂停判断，请检查接线")
+
         # ---------------- 断电与锁定 ----------------
         new_alert: Optional[Dict[str, Any]] = None
         cut_hazards = [h for h in hazards.values() if h["cut"]]
-        hw = self._hw()
 
         # 现场复位（下位机上报复位事件，或硬件锁定由 True 变为 False）
         hw_latched = hw.get("latched") if hw else None
@@ -362,6 +373,10 @@ class SafetyStateMachine(QObject):
         if new_alert is not None:
             self.last_alert_time[new_alert["event_type"]] = now
             self.alert_triggered.emit(new_alert)
+
+        # 判断完整跑完才喂心跳：主线程卡死或这里之前抛异常，心跳就会停，下位机看门狗接管
+        if self.serial_controller is not None and hasattr(self.serial_controller, "feed"):
+            self.serial_controller.feed()
 
         top_alert = new_alert
         if top_alert is None and hazards:

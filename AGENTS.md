@@ -13,10 +13,11 @@
 1. **软件只能断电，不能通电。** 代码里不存在任何"通电 / 解锁继电器"的接口；恢复供电只能现场长按控制盒复位键，下位机复查温度和烟雾后才通电。`tests/test_platform.py` 会检查网页路由里没有 power/on、unlock、reset、release 之类的接口。
 2. **大模型不碰电闸。** 安全助手（`src/agent/`）的工具全部只读（`TOOLS` 里只有 get_status / get_recent_events / get_forecast / search_manual），测试会检查工具名里没有 power / relay / reset / unlock / cut。V-JEPA 2 和温度预测也只产生提醒，不参与断电。
 3. **安全判断不依赖任何界面。** 判断在 `src/core/engine.py` 的 `SafetyEngine` 里完成；小屏、电脑大窗口、网页大屏都只是显示和操作入口。不要把判断逻辑写回界面里。
-4. **下位机本地硬规则独立于开发板**：热源 ≥150℃、烟雾 ≥2500、30 秒收不到心跳且仍在加热 → 断电；上电时继电器默认断开。这些阈值写在固件里，网页上改不了。
-5. **演示数据不能和真实数据混用**：接上下位机后 `/api/demo/start` 返回 409。
-6. **API Key 只放环境变量**（默认 `DASHSCOPE_API_KEY`），网页上填的 Key 只存在内存里，不写文件、不回显。不要把 Key 写进 `config.yaml` 或提交到仓库。
-7. **界面文案用大白话**，不要写"感知 → 预测 → 研判 → 执行"这类口号，也不要用"研判、闭环、态势、赋能"这类词。界面布局和配色是队长精心设计的，除非被要求，否则不要改。
+4. **下位机本地硬规则独立于开发板**：热源 ≥150℃、烟雾 ≥2500、30 秒收不到心跳且仍在加热 → 断电；上电时继电器默认断开。这些阈值写在固件里，网页上改不了；`config.yaml → hardware` 要和烧进固件的值一致，网页上的断电阈值只能设在它以下。现场复位时热源 ≥120℃ 或烟雾 ≥1800（与开发板默认断电阈值一致）会被拒绝。
+5. **心跳由安全判断驱动**：`SafetyStateMachine.evaluate()` 每次跑完调用 `SerialComm.feed()`，超过 `serial.engine_stale_s`（5 秒）没被调用就停发心跳，让下位机看门狗接管。不要在别处定时发心跳。
+6. **演示数据不能和真实数据混用**：接上下位机后 `/api/demo/start` 和播放演示视频都返回 409，正在播放的演示视频会自动切回摄像头。
+7. **API Key 只放环境变量**（默认 `DASHSCOPE_API_KEY`），网页上填的 Key 只存在内存里，不写文件、不回显。不要把 Key 写进 `config.yaml` 或提交到仓库。
+8. **界面文案用大白话**，不要写"感知 → 预测 → 研判 → 执行"这类口号，也不要用"研判、闭环、态势、赋能"这类词。界面布局和配色是队长精心设计的，除非被要求，否则不要改。
 
 ## 3. 仓库结构
 
@@ -57,7 +58,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
 | `tools/` | `serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（41 项）、`test_platform.py`（39 项）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tests/` | `test_backend.py`（52 项）、`test_platform.py`（41 项）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）。有 `*_rknn_model/` 目录时优先用 NPU |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -110,7 +111,7 @@ ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp, humi, obj_t
 
 | 方向 | CMD | 内容 |
 |---|---|---|
-| 上→下 | 0x01 HEARTBEAT | [灯光等级 0/1/2]，每秒一次 |
+| 上→下 | 0x01 HEARTBEAT | [灯光等级 0/1/2]，安全判断正常运行时每秒一次 |
 | 上→下 | 0x02 POWER_OFF | [原因]；需要 ACK，0.25 s 超时重发，最多 3 次；结果见 `power_off_state` |
 | 上→下 | 0x03 PLAY_VOICE | [曲目号]（DFPlayer，`events.voice` 映射，1–13） |
 | 上→下 | 0x04 SET_ENV | `<BhBB` 模式(0 自动/1 手动)、温度设定×10、湿度下限、湿度上限 |
@@ -137,8 +138,8 @@ cd labguard
 pip install -r requirements.txt          # Python 3.10–3.12
 python run_app.py                          # 电脑大窗口 + 网页 http://127.0.0.1:8080
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
-python tests/test_backend.py               # 41 项，无需硬件
-python tests/test_platform.py              # 39 项，无需硬件和大模型
+python tests/test_backend.py               # 52 项，无需硬件
+python tests/test_platform.py              # 41 项，无需硬件和大模型
 python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 requirements-host.txt）
 ```
 
@@ -176,5 +177,5 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 ## 12. 当前状态
 
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、网页大屏、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、V-JEPA 2 电脑端流程。
-- 未验证：ESP32 固件未在真机编译；开发板（RK3588）还没到手，NPU 推理和开机自启未实测；V-JEPA 2 只用随机小模型跑通流程，正式模型（`facebook/vjepa2-vitl-fpc64-256`，约 1.3GB）的实际检测效果未验证。
+- 未验证：ESP32 固件已烧录真机并确认串口协议正常（2026-10-22 更新），但外设接线尚未开始，断电 / ACK / 复位、语音、烟雾全流程未实测；开发板（RK3588）已到手装好系统、NPU 推理正常（据队员反馈），开机自启未实测。V-JEPA 2 功能已按计划移除。
 - 截图和演示视频是电脑屏幕录像，不是真实实验台画面。

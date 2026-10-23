@@ -16,7 +16,10 @@ import threading
 from typing import Any
 
 DEFAULTS = {
-    "serial": {"port": "auto", "baudrate": 115200, "heartbeat_s": 1.0},
+    "serial": {"port": "auto", "baudrate": 115200, "heartbeat_s": 1.0, "engine_stale_s": 5.0},
+    "hardware": {"hard_limit_c": 150.0, "smoke_limit_raw": 2500},
+    "center": {"url": "", "node_token": "", "report_s": 2.0},
+    "voice": {"output": "dfplayer"},
     "camera": {"pano": 0, "desk": 0, "width": 640, "height": 480, "fourcc": "MJPG"},
     "vision": {"prefer_format": ["rknn", "onnx", "pt"], "imgsz": 640, "conf": 0.35, "iou": 0.45, "device": "cpu"},
     "presence": {"absent_seconds": 15.0, "recover_seconds": 1.0},
@@ -60,6 +63,9 @@ DEFAULTS = {
         "min_level": "WARNING",
         "timeout_s": 20.0,
         "send_images_remote": False,
+        "temperature": 0.3,
+        "max_tokens": 600,
+        "extra_prompt": "",
         "remote": {"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
                    "api_key_env": "DASHSCOPE_API_KEY", "model": "qwen-plus", "vision_model": "qwen-vl-plus"},
         "local": {"base_url": "http://127.0.0.1:11434/v1", "api_key_env": "", "model": "qwen2.5:7b",

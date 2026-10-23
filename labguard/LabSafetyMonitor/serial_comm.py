@@ -15,7 +15,7 @@ LabSafetyMonitor/serial_comm.py
     CRC16-CCITT(多项式 0x1021, 初值 0xFFFF)，计算范围：LEN、SEQ、CMD、PAYLOAD
 
 上位机 → 下位机：
-    0x01 HEARTBEAT   payload: [alert_level u8]   0=绿 1=黄 2=红
+    0x01 HEARTBEAT   payload: [alert_level u8]   0=绿 1=黄 2=红；只在安全判断正常运行时发送（见 feed()）
     0x02 POWER_OFF   payload: [reason u8]        需要 ACK
     0x03 PLAY_VOICE  payload: [track u8]         DFPlayer 曲目号
 下位机 → 上位机：
@@ -179,6 +179,10 @@ class SerialComm:
         self.port: Optional[str] = None
         self.baudrate = int(cfg("serial.baudrate", baudrate) or baudrate)
         self.heartbeat_s = float(cfg("serial.heartbeat_s", 1.0) or 1.0)
+        # 心跳由安全判断驱动：状态机每跑完一次 evaluate() 就调用 feed()；
+        # 超过 engine_stale_s 秒没被喂过（主线程卡死 / 判断反复异常），就停发心跳，让下位机看门狗兜底
+        self.engine_stale_s = float(cfg("serial.engine_stale_s", 5.0) or 5.0)
+        self._last_feed = 0.0
 
         self.serial_conn: Optional[serial.Serial] = None
         self.running = False
@@ -366,6 +370,14 @@ class SerialComm:
         self._cmd_q.put((CMD_SET_ACT, bytes([max(0, min(100, int(fan_pwm))), 1 if humid else 0]), False))
         return True
 
+    def feed(self):
+        """安全判断正常完成一次后调用；只有持续被调用，心跳才会继续发出"""
+        self._last_feed = time.time()
+
+    @property
+    def engine_alive(self) -> bool:
+        return time.time() - self._last_feed < self.engine_stale_s
+
     def set_alert_level(self, level: int):
         level = max(0, min(2, int(level)))
         if level != self.alert_level:
@@ -404,7 +416,7 @@ class SerialComm:
                         self._handle(seq, cmd, payload)
 
                 now = time.time()
-                if self._hb_dirty or now - last_hb >= self.heartbeat_s:
+                if self.engine_alive and (self._hb_dirty or now - last_hb >= self.heartbeat_s):
                     self._hb_dirty = False
                     last_hb = now
                     self._write(build_frame(self._next_seq(), CMD_HEARTBEAT, bytes([self.alert_level])))

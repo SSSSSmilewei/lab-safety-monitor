@@ -34,6 +34,7 @@ def main():
     if args.port:
         link.port_setting = args.port
     link.add_listener(lambda kind, info: kind != "telemetry" and print(f"  <事件> {kind}: {info}"))
+    link.feed()
     link.connect()
     link.set_alert_level(args.level)
     print("等待下位机数据（Ctrl+C 退出）...")
@@ -42,6 +43,7 @@ def main():
     try:
         while True:
             time.sleep(1.0)
+            link.feed()   # 调试工具没有安全判断，手动喂心跳，避免触发下位机看门狗
             if not link.is_alive:
                 print(" ", link.status_text())
                 continue
