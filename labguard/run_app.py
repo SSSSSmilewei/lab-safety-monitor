@@ -76,12 +76,13 @@ def _check_qt_version():
 
 def main():
     _install_crash_log()
-    _check_qt_version()
     ap = argparse.ArgumentParser(description="实验室安全事前干预监测系统")
     ap.add_argument("--mode", choices=["desktop", "edge", "headless"], default="desktop")
     ap.add_argument("--no-web", action="store_true", help="不启动 Web 总后台")
     ap.add_argument("--windowed", action="store_true", help="小屏界面以窗口方式运行（调试用）")
     args = ap.parse_args()
+    if args.mode != "headless":     # 闪退出在界面绘制；headless 不画界面，不受影响
+        _check_qt_version()
 
     if args.mode == "headless":
         try:

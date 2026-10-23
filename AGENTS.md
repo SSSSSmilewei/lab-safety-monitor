@@ -61,7 +61,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `hub/jepa_worker.py` (247) | 电脑端 V-JEPA 2 画面异常检测（可选）；`--selftest` 不下载模型自检 |
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh，视美泰 AIOT-3588A 和香橙派 5 通用）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
-| `tools/` | `center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型（x86 上运行，附模拟器对比）、`check_npu.py` 板子上检查 NPU（版本、加载、速度、和 .pt 对比）、`gen_voice.py` 生成语音文件 |
+| `tools/` | `center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面、`--live LG-A01` 把一张桌留给真实开发板程序接入，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型（x86 上运行，附模拟器对比）、`check_npu.py` 板子上检查 NPU（版本、加载、速度、和 .pt 对比）、`gen_voice.py` 生成语音文件 |
 | `tests/` | `test_backend.py`（80 项）、`test_platform.py`（44 项）、`test_center.py`（71 项，总后台 + 开发板接入 + 平面图与演示画面）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）、`*_rknn_model/`（导出好的 NPU 模型，FP16，入库）。只有在 Rockchip 板子上才用 RKNN；NPU 加载失败时自动改用 .pt 并记一条事件 |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
