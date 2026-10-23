@@ -53,7 +53,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `src/agent/llm_client.py` (173) | OpenAI 兼容客户端，线路 `agent.route`：auto（远程→本地）/ remote / local / off；只用标准库 urllib |
 | `src/agent/rag.py` (76) | 安全手册检索：`knowledge/*.md` 按"## 标题"切条，中文二元组 + BM25 |
 | `src/web/server.py` (433) + `src/web/static/` | 网页大屏（FastAPI + 原生 JS，无构建、无 CDN）。口令鉴权；接口见第 8 节 |
-| `src/ui/kiosk.py` | 实验台小屏（PyQt/PySide，800×480 为基准自适应）。面向同学：状态页左「待处理事项」（交叉验证依据的 `action`）、中热源、右防护与环境。`ui.style`：standard（默认）/ pixel（旧版 Zpix） |
+| `src/ui/kiosk.py` | 实验台小屏（PyQt/PySide，800×480 为基准自适应）。面向同学：状态页左「待处理事项」（交叉验证依据的 `action`）、中热源、右防护与环境；顶栏「地址」页列出本机控制台网址 + 口令和总后台地址（`center.url`）与连接状态。`ui.style`：pixel（默认，Zpix 像素风格）/ standard（新版） |
 | `src/ui/main_window.py` (1590) | 电脑大窗口（项目最早的完整界面）；设计令牌类 `T`、`Card`、`Chip`、`load_pixel_font()` 被小屏复用 |
 | `LabSafetyMonitor/dual_inference.py` (849) | 摄像头读取 + 两个 YOLO 模型推理 + 在场判断 + 时间投票 + 伏案 + 桌边线；产出 `alarms` 字典和带框画面 |
 | `LabSafetyMonitor/serial_comm.py` (481) | 下位机串口协议（第 7 节）；单例 `SerialComm.get_shared()` |
@@ -221,4 +221,4 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 - 开发板：视美泰 AIOT-3588A（4GB，系统在 16GB TF 卡，Ubuntu 22.04）已调通小屏、USB 摄像头、开机自启（edge 模式）。RKNN 模型已导出（rknn-toolkit2 2.3.2，FP16），真机 NPU 实测（`tools/check_npu.py`）ppe_best 120 ms/帧、chem_best 116 ms/帧，结果与 .pt 一致。
 - ESP32 固件：已在 ESP32-S3-N8R8 真机烧录，串口协议、断电 ACK 往返（中位 4.9 ms）实测正常；蜂鸣器为非阻塞。传感器、继电器、控制键接上后的整机联调未完成。V-JEPA 2 功能已按计划移除。
 - 截图和演示视频是电脑屏幕录像，不是真实实验台画面。
-- 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」，不是默认：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`）；开发板本机控制台按浏览器切换（恢复旧版靛蓝描边 + Zpix）；实验台小屏用 `config.yaml → ui.style: pixel`。电脑大窗口（main_window.py）保持旧版。
+- 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」，不是默认：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`）；开发板本机控制台按浏览器切换（恢复旧版靛蓝描边 + Zpix）；实验台小屏**默认就是像素风格**（`config.yaml → ui.style: pixel`，改成 standard 用新版）。电脑大窗口（main_window.py）保持旧版。

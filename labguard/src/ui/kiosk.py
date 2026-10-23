@@ -156,7 +156,7 @@ class KioskWindow(QWidget):
         self.engine = engine
         self.setWindowTitle("实验台安全终端")
         # ---- 风格：standard（默认）/ pixel（旧版） ----
-        self.pixel = str(cfg("ui.style", "standard")).lower() == "pixel"
+        self.pixel = str(cfg("ui.style", "pixel")).lower() != "standard"     # 默认像素风格
         self.LINE = T.PRIMARY if self.pixel else "#1A1F3D"      # 描边与硬阴影
         self.INK = T.INK if self.pixel else "#1A1F3D"            # 正文
         self.DIM = T.DIM if self.pixel else "#4B5394"            # 次要文字
@@ -266,7 +266,7 @@ class KioskWindow(QWidget):
         col.addWidget(self.state_sub)
         self.links = self._lbl("", 12, self.DIM)
         self.clock = self._lbl("", 18, kind="num")
-        self.btn_set = QPushButton("设置")
+        self.btn_set = QPushButton("地址")
         self.btn_set.setFixedSize(self.px(72), self.px(52))
         self.btn_set.setStyleSheet(f"font-size: {self.px(16)}px; padding: 0;")
         self.btn_set.clicked.connect(lambda: self._goto(3))
@@ -480,7 +480,7 @@ class KioskWindow(QWidget):
         self.set_lbl = self._lbl("", 17)
         self.set_lbl.setWordWrap(True)
         self.set_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        page.body.addWidget(self._lbl("▌本机控制台访问", 18, T.PRIMARY, "hd"))
+        page.body.addWidget(self._lbl("▌访问地址", 18, T.PRIMARY, "hd"))
         page.body.addWidget(self.set_lbl)
         page.body.addStretch(1)
         back = self._btn("返回状态页", 18)
@@ -495,10 +495,27 @@ class KioskWindow(QWidget):
         for j, b in enumerate(self.tab_btns):
             b.setChecked(j == i)
         if i == 3:
-            from src.web.server import web_token, web_port
-            port = web_port()
-            self.set_lbl.setText(f"浏览器访问：\nhttp://{_local_ip()}:{port}\n\n口令：{web_token()}\n\n"
-                                 f"功能：双路画面、参数配置、台面安全区、安全助手、温度预测、环境控制、事件复核。")
+            self.set_lbl.setText(self._access_text())
+
+    def _access_text(self) -> str:
+        """地址页：本机控制台（本机网页）+ 总后台（多实验室管理中心）"""
+        from src.web.server import web_token, web_port
+        port, tok = web_port(), web_token()
+        ip = _local_ip()
+        host = ip if ip != "127.0.0.1" else "127.0.0.1"
+        lines = ["【本机控制台】画面、参数、台面安全区、安全助手、事件复核",
+                 f"  http://{host}:{port}/?token={tok}",
+                 f"  口令 {tok}" + ("" if ip != "127.0.0.1" else "（未连网络，仅本机可访问）"), ""]
+        url = str(cfg("center.url", "") or "").strip()
+        center = self.engine.extensions.get("center") if hasattr(self.engine, "extensions") else None
+        lines.append("【总后台】多实验室总览、账号与授权、阈值配置、模型看板")
+        if url:
+            st = "已连接" if center is not None and getattr(center, "online", False) else \
+                "未连接" + (f"（{center.last_error[:40]}）" if center is not None and getattr(center, "last_error", "") else "")
+            lines += [f"  {url}", f"  状态 {st} · 使用老师 / 管理员账号登录"]
+        else:
+            lines += ["  未接入：在 config.yaml → center.url 填写总后台地址，", "  并填写 center.node_token（总后台登记终端时生成）"]
+        return "\n".join(lines)
 
     def _toggle_cam(self):
         self._cam = "desk" if self._cam == "pano" else "pano"
@@ -560,7 +577,9 @@ class KioskWindow(QWidget):
         self._restyle(self.state_sub, 12, txt)
         mcu = "●" if s["link"]["mcu"] else "○"
         cam = "●" if s["vision"]["ok"] else "○"
-        self.links.setText(f"{mcu}下位机 {cam}视觉")
+        center = self.engine.extensions.get("center") if hasattr(self.engine, "extensions") else None
+        cen = "●" if center is not None and getattr(center, "online", False) else "○"
+        self.links.setText(f"{mcu}下位机 {cam}视觉 {cen}总后台")
         self.clock.setText(time.strftime("%H:%M"))
         mute_left = int(s["mute_until"] - time.time()) if s["mute_until"] else 0
         self.btn_mute.setText(f"静音中 {mute_left}s" if mute_left > 0 else "静音 60s")
