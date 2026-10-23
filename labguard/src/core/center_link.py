@@ -26,6 +26,15 @@ TRIM_WM = ("phase", "phase_text", "temp", "slope", "eta_s", "eta_boil_s", "plate
 RULE_PREFIXES = ("rules.", "presence.", "voting.", "events.", "vision.", "cross.")
 
 
+def local_web_port() -> int:
+    """本机控制台实际监听的端口（配置的端口被占用时会自动顺延），总后台按它取画面、转发问答"""
+    try:
+        from src.web.server import web_port
+        return web_port()
+    except ImportError:          # 没装网页依赖：本机控制台没启动，报配置值即可
+        return int(cfg("web.port", 8080))
+
+
 def node_token() -> str:
     return str(cfg("center.node_token", "") or os.environ.get("LABGUARD_NODE_TOKEN", "") or "").strip()
 
@@ -70,7 +79,7 @@ class CenterLink:
         return {
             "snapshot": snap,
             "meta": {
-                "web_port": int(cfg("web.port", 8080)),
+                "web_port": local_web_port(),
                 "hostname": socket.gethostname(),
                 "hard_limit_c": float(cfg("hardware.hard_limit_c", 150.0)),
                 "smoke_limit_raw": int(cfg("hardware.smoke_limit_raw", 2500)),
