@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>实验室安全总后台</title>
+<title>实验台终端 · 本机控制台</title>
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
@@ -14,10 +14,10 @@
 
 <div class="login hidden" id="login">
   <div class="card">
-    <div class="sec-t">▌总后台登录</div>
+    <div class="sec-t">本机控制台登录</div>
     <div class="muted">口令显示在实验台小屏的「设置」页，或板子上的 runtime/web_token.txt。</div>
     <input type="password" id="tokenInput" placeholder="输入 6 位口令" aria-label="口令" autocomplete="off">
-    <button class="btn primary big" id="loginBtn">进入总后台</button>
+    <button class="btn primary big" id="loginBtn">进入控制台</button>
     <div class="muted" id="loginMsg"></div>
   </div>
 </div>
@@ -26,7 +26,7 @@
   <!-- 顶栏：标题 + 安全状态 -->
   <div class="top">
     <div class="card title-card">
-      <h1>基于双摄协同的实验室安全事前干预监测系统 · 总后台</h1>
+      <h1>基于双摄协同的实验室安全事前干预监测系统 · 本机控制台</h1>
     </div>
     <div class="card hero" id="hero">
       <div class="badge" id="heroBadge">—</div>
@@ -46,6 +46,7 @@
     <button class="btn" data-tab="review">事件复核</button>
     <span class="spacer"></span>
     <span class="muted" id="linkInfo">—</span>
+    <button class="btn sm" id="uiToggle" title="切换界面风格（仅本浏览器）">像素风格</button>
   </div>
 
   <!-- ================= 总览 ================= -->
@@ -268,6 +269,7 @@
 </div>
 
 <div class="toast hidden" id="toast" role="status"></div>
+<script src="/static/icons.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

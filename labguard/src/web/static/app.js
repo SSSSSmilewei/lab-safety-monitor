@@ -13,6 +13,32 @@
     failed_no_link: '串口未连接 —— 请立即人工切断加热电源', failed_no_ack: '下位机未应答 —— 请立即人工切断加热电源' };
 
   var $ = function (id) { return document.getElementById(id); };
+
+  // ---------------- 界面风格：标准（默认）/ 像素（旧版 Zpix），记在本浏览器；?ui=pixel 也可直接打开 ----------------
+  var PIX = false, INK = '#1A1F3D', icon = window.icon || function () { return ''; };
+  var GLYPH = { '√': 'check', '■': 'alert', '▲': 'alert', '×': 'x', '?': 'eye' };
+  var BADGE = { NORMAL: ['ok', '安全'], WARNING: ['alert', '警告'], CRITICAL: ['alert', '危险'] };
+  var TAB_ICON = { ov: 'grid', params: 'sliders', agent: 'chat', wm: 'thermo', env: 'drop', review: 'check' };
+  // 文本开头的 √ ■ ▲ × ? 在标准风格下换成线条图标，像素风格保持原样；返回 HTML
+  function deco(text) {
+    text = String(text == null ? '' : text);
+    var c = text.charAt(0);
+    if (PIX || !GLYPH[c]) return esc(text);
+    return icon(GLYPH[c], 14) + esc(text.slice(1).replace(/^\s+/, ''));
+  }
+  function applyUi(pixel) {
+    PIX = !!pixel;
+    try { localStorage.setItem('labguard_ui', PIX ? 'pixel' : 'standard'); } catch (e) {}
+    if (PIX) document.documentElement.setAttribute('data-ui', 'pixel'); else document.documentElement.removeAttribute('data-ui');
+    C.ink = PIX ? '#3949AB' : INK; C.dim = PIX ? '#5A64A8' : '#4B5394';
+    STATE.NORMAL.text = C.ink;
+    document.querySelectorAll('.tabs [data-tab]').forEach(function (b) {
+      if (!b.dataset.label) b.dataset.label = b.textContent;
+      b.innerHTML = (PIX ? '' : icon(TAB_ICON[b.dataset.tab], 18)) + esc(b.dataset.label);
+    });
+    var t = $('uiToggle'); if (t) t.textContent = PIX ? '标准风格' : '像素风格';
+    if (snap) render(snap);
+  }
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var token = '';
@@ -25,9 +51,13 @@
     qs.delete('token');
     history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : '') + location.hash);
   }
+  var uiPref = qs.get('ui') || '';
+  if (!uiPref) { try { uiPref = localStorage.getItem('labguard_ui') || ''; } catch (e) {} }
   // ?still=1：画面改为每秒刷新一张图片（不支持 MJPEG 的浏览器 / 截图用）
   var still = qs.get('still') === '1';
   var snap = null, ws = null, heatHist = [], evCache = [], evFilter = 'all', chatHist = [];
+  applyUi(uiPref === 'pixel');
+  $('uiToggle').onclick = function () { applyUi(!PIX); };
 
   // ---------------- 通用 ----------------
   function toast(msg) {
@@ -104,9 +134,11 @@
   function render(s) {
     snap = s;
     var st = STATE[s.state] || STATE.NORMAL, hero = $('hero');
-    hero.style.background = st.bg; hero.style.borderColor = st.color; hero.style.boxShadow = '6px 6px 0 ' + st.shadow;
+    hero.style.background = st.bg; hero.style.borderColor = PIX ? st.color : INK; hero.style.boxShadow = '6px 6px 0 ' + (PIX ? st.shadow : INK);
     hero.classList.toggle('blink', s.state === 'CRITICAL');
-    var badge = $('heroBadge'); badge.style.background = st.color; badge.style.color = st.ink; badge.textContent = st.badge;
+    var badge = $('heroBadge'); badge.style.background = st.color; badge.style.color = st.ink;
+    var bd = BADGE[s.state] || BADGE.NORMAL;
+    badge.innerHTML = PIX ? esc(st.badge) : icon(bd[0], 30) + bd[1];
     $('heroState').textContent = s.state_text; $('heroState').style.color = st.text;
     $('heroUptime').textContent = '运行 ' + hms(s.uptime_s);
     var reason;
@@ -121,7 +153,7 @@
     renderWorld(s); renderEnv(s); renderAgentStatus(s);
   }
 
-  function chip(el, text, fg, bg, border) { el.textContent = text; el.style.color = fg; el.style.background = bg; el.style.borderColor = border || fg; }
+  function chip(el, text, fg, bg, border) { el.innerHTML = deco(text); el.style.color = fg; el.style.background = bg; el.style.borderColor = PIX ? (border || fg) : INK; }
   function renderCams(s) {
     var v = s.vision;
     if (!v.ok) chip($('chipPano'), '视觉离线', '#fff', C.danger);
@@ -162,8 +194,9 @@
       else if (wm.t_inf != null && wm.t_inf < 90) eta = '按当前趋势将稳定在约 ' + Math.round(wm.t_inf) + '℃';
       else eta = '预测：' + (wm.phase_text || '采样中');
     }
-    card.className = 'card heat lv-' + lv; card.style.boxShadow = '6px 6px 0 ' + ({ ok: C.primary, warn: C.warn, bad: C.danger })[lv];
-    var tg = $('heatTag'); tg.textContent = tag;
+    card.className = 'card heat lv-' + lv;
+    card.style.boxShadow = PIX ? '6px 6px 0 ' + ({ ok: C.primary, warn: C.warn, bad: C.danger })[lv] : '';
+    var tg = $('heatTag'); tg.innerHTML = deco(tag);
     tg.style.background = { ok: '#DDF7EC', warn: C.warn, bad: C.danger }[lv]; tg.style.color = { ok: C.safe, warn: C.warnInk, bad: '#fff' }[lv];
     if (t == null) { tg.style.background = '#E8EAF6'; tg.style.color = C.ink; }
     $('heatEta').textContent = eta; $('heatEta').style.color = etaColor;
@@ -178,7 +211,7 @@
 
   function tile(id, val, lv, hint) {
     var el = $(id); el.className = 'tile lv-' + lv;
-    el.querySelector('.v').textContent = val; el.querySelector('.hint').textContent = hint;
+    el.querySelector('.v').textContent = val; el.querySelector('.hint').innerHTML = deco(hint);
   }
   function renderTiles(s) {
     var t = s.telemetry, r = s.rules;
@@ -206,10 +239,10 @@
     $('presence').textContent = v.person_present == null ? '画面无效' : (v.unattended ? '无人值守' : '人员在岗');
     var mute = s.mute_until ? Math.max(0, Math.round(s.mute_until - Date.now() / 1000)) : 0;
     $('btnMute').textContent = mute ? '静音中 ' + mute + 's' : '静音语音 60s';
-    var icon = { ok: '√', bad: '■', unknown: '?' };
+    var mark = { ok: '√', bad: '×', unknown: '?' };
     $('ppeList').innerHTML = v.ppe.map(function (p) {
       var lv = p.status === 'bad' ? 'bad' : (p.status === 'ok' ? 'ok' : 'ok');
-      return '<div class="lv-' + lv + '" style="' + (p.status === 'unknown' ? 'color:' + C.dim : '') + '">' + icon[p.status] + ' ' + esc(p.name) + '</div>';
+      return '<div class="lv-' + lv + '" style="' + (p.status === 'unknown' ? 'color:' + C.dim : '') + '">' + deco(mark[p.status] + ' ' + p.name) + '</div>';
     }).join('');
   }
 
@@ -226,11 +259,11 @@
     var img = e.snapshot ? '<img class="thumb" loading="lazy" alt="事件截图" src="/api/events/' + e.uid + '/snapshot.jpg?token=' + encodeURIComponent(token) + '">' : '';
     var note = e.agent_note ? '<div class="note">处理建议：' + esc(e.agent_note) + '</div>' : '';
     var foot;
-    if (e.review === 1) foot = '<div class="done" style="color:' + C.safe + '">√ 已复核：判断正确</div>';
-    else if (e.review === 0) foot = '<div class="done" style="color:' + C.danger + '">× 已复核：误报</div>';
-    else foot = '<div class="row"><button class="btn sm ok" data-rev="1" data-uid="' + e.uid + '">√ 正确</button><button class="btn sm" style="color:' + C.danger + ';border-color:' + C.danger + '" data-rev="0" data-uid="' + e.uid + '">× 误报</button>' +
+    if (e.review === 1) foot = '<div class="done" style="color:' + C.safe + '">' + deco('√ 已复核：判断正确') + '</div>';
+    else if (e.review === 0) foot = '<div class="done" style="color:' + C.danger + '">' + deco('× 已复核：误报') + '</div>';
+    else foot = '<div class="row"><button class="btn sm ok" data-rev="1" data-uid="' + e.uid + '">' + deco('√ 正确') + '</button><button class="btn sm" style="color:' + C.danger + ';border-color:' + C.danger + '" data-rev="0" data-uid="' + e.uid + '">' + deco('× 误报') + '</button>' +
       (e.agent_note ? '' : '<button class="btn sm" data-ai="' + e.uid + '">生成建议</button>') + '</div>';
-    return '<div class="ev ' + e.level + '"><div class="h"><span class="tag">' + (LEVEL_TAG[e.level] || e.level) + '</span><span class="title">' + esc(e.title) +
+    return '<div class="ev ' + e.level + '"><div class="h"><span class="tag">' + deco(LEVEL_TAG[e.level] || e.level) + '</span><span class="title">' + esc(e.title) +
       '</span><span class="time">' + esc(e.time_str) + '</span></div><div class="msg">' + esc(e.message) + '</div>' + img + note + foot + '</div>';
   }
   function renderEvents(list, st) {

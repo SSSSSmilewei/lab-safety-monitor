@@ -129,12 +129,12 @@ ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp, humi, obj_t
 flags：bit0 继电器闭合、bit1 锁定、bit2 心跳正常、bit3 SHT30 正常、bit4 MLX90614 正常、bit5 MQ-2 预热完成、bit6 本地危险。
 ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/13、蜂鸣器 14、复位键 4、DFPlayer RX 18 / TX 17、风扇 PWM 15、加湿 16。
 
-## 8. 网页大屏接口（`src/web/server.py`，默认端口 8080）
+## 8. 开发板本机控制台接口（`src/web/server.py`，端口 `web.port`，本仓库 config.yaml 为 8180）
 
 - 除 `/`、`/static/*`、`/font/*`、`/api/ping` 外都要口令：请求头 `X-Token` 或 `?token=`。口令为 `web.token`，留空则自动生成并写入 `runtime/web_token.txt`。
 - 只读：`GET /api/snapshot`、`WS /ws`（2 Hz 推送 snapshot + 最近事件）、`GET /api/events`、`GET /api/events/{uid}/snapshot.jpg`、`GET /stream/{pano|desk}.mjpg`、`GET /api/frame/{pano|desk}.jpg`、`GET /api/config`、`/api/models`、`/api/media`、`/api/agent`、`/api/env`、`/api/demo`。
 - 写：`PATCH /api/config`（仅 `TUNABLE` 白名单 + 范围校验）、`PUT /api/desk/zone`（台面安全区，`{points, danger, margin}`，points 为空则清除）、`POST /api/model`、`/api/camera`、`/api/power/cut`（需 `{"confirm": true}`，**只能断电**）、`/api/mute`、`/api/events/{uid}/review`、`/api/manual_snapshot`、`/api/agent/config|test|ask|report`、`/api/events/{uid}/agent`、`/api/env/setpoint|manual`、`/api/demo/start|stop`、`/api/jepa/score`。
-- 网页 URL 参数：`?token=XXXXXX` 直接登录，`?still=1` 用单张图片轮询代替 MJPEG，`#tab=ov|params|agent|wm|env|review` 打开指定页签。
+- 网页 URL 参数：`?token=XXXXXX` 直接登录，`?still=1` 用单张图片轮询代替 MJPEG，`#tab=ov|params|agent|wm|env|review` 打开指定页签，`?ui=pixel` 切换旧版像素风格（页签栏右侧按钮同样可切，记在本浏览器）。
 
 ### 总后台（`center/app.py`，默认端口 8200）
 
@@ -148,7 +148,7 @@ ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/
 ```bash
 cd labguard
 pip install -r requirements.txt          # Python 3.10–3.12
-python run_app.py                          # 电脑大窗口 + 网页 http://127.0.0.1:8080
+python run_app.py                          # 电脑大窗口 + 网页 http://127.0.0.1:8180
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
 python tests/test_backend.py               # 75 项，无需硬件
 python tests/test_platform.py              # 44 项，无需硬件和大模型
@@ -194,4 +194,4 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、网页大屏、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、V-JEPA 2 电脑端流程。
 - 未验证：ESP32 固件已烧录真机并确认串口协议正常（2026-10-22 更新），但外设接线尚未开始，断电 / ACK / 复位、语音、烟雾全流程未实测；开发板（RK3588）已到手装好系统、NPU 推理正常（据队员反馈），开机自启未实测。V-JEPA 2 功能已按计划移除。
 - 截图和演示视频是电脑屏幕录像，不是真实实验台画面。
-- 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`），不是默认。
+- 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」，不是默认：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`）；开发板本机控制台按浏览器切换（恢复旧版靛蓝描边 + Zpix）。

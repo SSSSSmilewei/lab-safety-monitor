@@ -12,3 +12,4 @@ pyserial>=3.5
 PyYAML>=6.0
 fastapi>=0.110              # 网页大屏
 uvicorn>=0.29
+websockets>=12.0            # 网页实时推送（uvicorn 默认不带，缺了网页一直显示「重连中」）

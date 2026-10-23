@@ -102,6 +102,9 @@ def create_app(engine) -> FastAPI:
         return FileResponse(FONT_PATH, media_type="font/ttf")
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    fonts_dir = os.path.join(PROJECT_ROOT, "fonts")   # 得意黑、JetBrains Mono（SIL OFL），与总后台共用
+    if os.path.isdir(fonts_dir):
+        app.mount("/fonts", StaticFiles(directory=fonts_dir), name="fonts")
 
     @app.get("/api/ping")
     def ping():
