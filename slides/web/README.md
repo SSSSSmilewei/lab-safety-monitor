@@ -5,7 +5,7 @@
 - 翻页：→ / 空格 / 点击画面右侧；← / 点击画面左侧返回；底部章节栏可跳转
 - `N` 显示 / 隐藏提词，`F` 全屏
 - 网址末尾加 `#b9` 可直接打开第 9 拍
-- 7 章 22 拍；平面图等级来自 `labguard/tools/center_demo.py` 的演示场景，模型曲线来自 `labguard/models/model_card.json`
+- 8 章 24 拍，从第 2 拍起每页都对应仓库里的具体模块和代码；平面图等级来自 `labguard/tools/center_demo.py` 的演示场景，模型曲线来自 `labguard/models/model_card.json`
 
 ## 字体
 
@@ -21,4 +21,4 @@
 
 - `img/kiosk-warning.png`、`img/kiosk-locked.png`、`img/advice-card.png` 取自 `docs/上手指南图片/`（实机程序截图，像素风格界面）
 - `img/center-floorplan.png` 取自 `docs/截图/`（总后台演示数据）
-- 第 21 拍「实物运行」：把照片放成 `img/photo-1.jpg`、`photo-2.jpg`、`photo-3.jpg`，占位框会自动换成照片
+- 第 23 拍「实物运行」：把照片放成 `img/photo-1.jpg`、`photo-2.jpg`、`photo-3.jpg`，占位框会自动换成照片

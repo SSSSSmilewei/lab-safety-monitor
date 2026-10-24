@@ -161,12 +161,13 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
 .facts > div { padding: 30px 36px 0 0; display: flex; flex-direction: column; gap: 12px; }
 .facts > div + div { padding-left: 36px; border-left: 1px solid var(--line); }
 .facts b { font-family: var(--f-hd); font-weight: 600; font-size: 38px; color: var(--ink); line-height: 1.2; }
-.axis { left: 240px; top: 556px; width: 1440px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgba(var(--g), .5) 0 30%, rgba(var(--y), .6) 30% 70%, rgba(var(--r), .55) 70% 100%); }
-.tick { position: absolute; top: 590px; font: 500 22px var(--f-num); color: var(--ink-3); transform: translateX(-50%); }
-.tick::before { content: ""; position: absolute; left: 50%; top: -30px; width: 2px; height: 18px; background: var(--ink-3); }
+.axis { left: 240px; top: 760px; width: 1440px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgba(var(--g), .5) 0 30%, rgba(var(--y), .6) 30% 70%, rgba(var(--r), .55) 70% 100%); }
+.tick { position: absolute; top: 784px; font-size: 19px !important; font: 500 22px var(--f-num); color: var(--ink-3); transform: translateX(-50%); }
+.tick::before { content: ""; position: absolute; left: 50%; top: -18px; width: 2px; height: 18px; background: var(--ink-3); }
 .case { width: 440px; padding: 26px 28px; display: flex; flex-direction: column; gap: 14px; transition: transform .6s var(--ease-out), opacity .6s; opacity: .5; box-sizing: border-box; }
 .case.on { opacity: 1; transform: translateY(-10px); box-shadow: var(--shadow); }
-.case p { margin: 0; font-size: 26px; line-height: 1.5; color: var(--ink); }
+.case p { margin: 0; font-size: 24px; line-height: 1.4; color: var(--ink); }
+.case .pts { font: 500 17px var(--f-num); color: var(--ink-2); }
 .case .say { font-size: 22px; color: var(--ink-2); }
 .matrix { left: 160px; top: 380px; width: 1600px; display: grid; grid-template-columns: 540px repeat(3, 1fr); row-gap: 12px; }
 .matrix .row { display: contents; }
@@ -197,6 +198,38 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
 .rules3 { left: 720px; top: 540px; width: 1040px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 40px; }
 .rules3 > div { padding: 22px 0; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); }
 .rules3 > div.wide { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: 26px; }
+
+/* 工程视角组件 */
+.req { display: grid; grid-template-columns: 380px 600px 1fr; }
+.req > div { padding: 24px 28px 24px 0; border-bottom: 1px solid var(--line); font-size: 25px; line-height: 1.5; color: var(--ink); }
+.req > .h { font-size: 20px; color: var(--ink-3); padding: 0 0 14px; }
+.req > .g { color: var(--ink-2); }
+.pipe { display: flex; flex-direction: column; gap: 10px; }
+.pipe .p { padding: 13px 20px; border-radius: 14px; background: #fff; border: 1px solid var(--line); font-size: 20px; color: var(--ink-2); display: flex; align-items: baseline; gap: 18px; }
+.pipe .p code { font: 600 20px var(--f-num); color: var(--ink); white-space: nowrap; }
+.pipe .p.sub { margin-left: 52px; background: #F7F8FC; position: relative; }
+.pipe .p.sub::before { content: ""; position: absolute; left: -30px; top: 50%; width: 22px; border-top: 2px solid rgba(26, 31, 61, .2); }
+.pipe .p.core { background: var(--code-bg); border-color: transparent; color: #A9B0D3; }
+.pipe .p.core code { color: #fff; }
+.chain { display: flex; align-items: center; gap: 10px; }
+.chain span { height: 46px; padding: 0 16px; border-radius: 10px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; font: 500 18px var(--f-num); color: var(--ink); white-space: nowrap; }
+.chain i { width: 26px; height: 2px; background: var(--ink-3); position: relative; flex: none; }
+.chain i::after { content: ""; position: absolute; right: -2px; top: -5px; border: 6px solid transparent; border-left: 9px solid var(--ink-3); border-right: 0; }
+.rtab { display: grid; grid-template-columns: 74px 1fr 200px; font-size: 22px; }
+.rtab > div { padding: 11px 12px 11px 0; border-bottom: 1px solid var(--line); color: var(--ink); line-height: 1.35; }
+.rtab > .h { font-size: 18px; color: var(--ink-3); padding-top: 0; }
+.rtab .id { font: 700 20px var(--f-num); }
+.rtab .cut { color: #A3221B; font-weight: 600; } .rtab .warn { color: #8A5200; } .rtab .note { color: var(--ink-2); }
+.node2 { width: 340px; height: 150px; box-sizing: border-box; padding: 26px 30px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.node2 b { font-family: var(--f-hd); font-weight: 600; font-size: 34px; color: var(--ink); }
+.node2 span { font-size: 18px; color: var(--ink-3); }
+.arrow2 { display: flex; flex-direction: column; gap: 8px; }
+.arrow2 span { font: 500 18px var(--f-num); color: var(--ink-2); text-align: center; }
+.arrow2 i { display: block; height: 2px; background: var(--ink-3); position: relative; }
+.arrow2 i::after { content: ""; position: absolute; right: -2px; top: -6px; border: 7px solid transparent; border-left: 11px solid var(--ink-3); border-right: 0; }
+.arrow2.back i::after { right: auto; left: -2px; border-left: 0; border-right: 11px solid var(--ink-3); }
+.mgmt .src { margin-top: 2px; }
+.mgmt.sm > div { padding: 20px 0 22px; gap: 8px; } .mgmt.sm h3 { font-size: 32px; } .mgmt.sm .body { font-size: 22px; line-height: 1.5; }
 
 /* 总后台 */
 .plan { left: 140px; top: 236px; width: 1640px; height: 720px; }
@@ -286,73 +319,147 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
   <div id="stage" aria-live="polite">
     <div id="halo"></div>
 
-    <!-- ============ 片头 ============ -->
     <section class="beat" data-ch="0" aria-label="片头">
       <div class="abs in" style="left:0;right:0;top:520px;text-align:center;--i:1"><h1 class="hd h-xl">基于双摄协同的实验室安全<br>事前干预监测系统</h1></div>
       <p class="abs small in" style="left:0;right:0;top:800px;text-align:center;font-size:28px;--i:3">放在每一张实验桌上的安全终端</p>
     </section>
-
-    <!-- ============ 需求 ============ -->
-    <section class="beat" data-ch="1" aria-label="监控只能记录">
+    <section class="beat" data-ch="1" aria-label="需求与约束">
       <div class="abs cam-mount"></div><div class="abs cam"></div>
-      <div class="abs" style="left:760px;top:240px;width:1000px">
+      <div class="abs" style="left:560px;top:150px;width:1200px">
         <h2 class="hd h-l in" style="--i:0">监控只能事后回看</h2>
-        <p class="lead in" style="margin-top:30px;--i:1">天花板监控记录的是已经发生的事。事故发生时它不能干预，事故发生前它也不能预警。</p>
-        <div class="flow3 in" style="margin-top:64px;--i:2"><div class="step">事故发生</div><div class="arr"></div><div class="step">录像存档</div><div class="arr"></div><div class="step">事后调取</div></div>
+        <p class="lead in" style="margin-top:22px;--i:1">三个缺口，对应三条工程约束，再落到具体的硬件和模块。</p>
+      </div>
+      <div class="abs req in" style="left:160px;top:420px;width:1600px;--i:2">
+        <div class="h">缺口</div><div class="h">工程约束</div><div class="h">落到哪里</div>
+        <div>事故发生时不能干预</div><div class="g">能直接切断加热电源；开发板程序出故障时也要能断</div><div>ESP32-S3 控制盒 + 继电器；固件本地硬规则与心跳看门狗</div>
+        <div>事故发生前不能预警</div><div class="g">识别和判断在实验桌本机实时完成，不依赖网络和人工盯守</div><div>每桌一台 RK3588 终端，NPU 推理，SafetyEngine 本地运行</div>
+        <div>俯拍看不清台面</div><div class="g">器皿种类、离桌边的距离、热源温度都要测得到</div><div>第二路台面摄像头 + 器皿模型；MLX90614 红外测温</div>
       </div>
     </section>
-
-    <section class="beat" data-ch="1" aria-label="看不清台面">
-      <div class="abs cam-mount"></div><div class="abs cam"></div>
-      <svg class="abs in" width="1920" height="1080" aria-hidden="true" style="left:0;top:0;--i:0"><polygon points="362,262 760,330 760,900" fill="rgba(92,107,192,.08)"/></svg>
-      <div class="abs" style="left:160px;top:400px;width:540px">
-        <h2 class="hd h-m in" style="--i:0">看得到人，<br>看不清台面</h2>
-        <p class="body in" style="margin-top:26px;--i:1">俯拍画面里分辨不出器皿种类、离桌边的距离和温度。一间实验室几十路画面，也不可能有人实时盯守。</p>
+    <section class="beat" data-ch="1" aria-label="系统组成">
+      <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">系统组成：三个独立程序</h2>
+      <div class="abs arch">
+        <div class="tier-box sheet in" style="left:0;width:390px;--i:1"><h3>控制盒</h3><span class="meta">ESP32-S3，Arduino 固件</span>
+          <div class="mod">SHT30 温湿度<br>MLX90614 红外测温<br>MQ-2 烟雾</div><div class="mod">继电器（加热电源）<br>控制键、信号灯、蜂鸣器</div><div class="mod core">本地硬规则<small>150℃ / 2500 / 心跳 30 s</small></div></div>
+        <div class="wire in" style="left:400px;top:290px;width:150px;--i:2">USB 串口<i></i>AA 55 帧<br>CRC16</div>
+        <div class="tier-box sheet in" style="left:560px;width:660px;--i:2"><h3>实验台终端</h3><span class="meta">RK3588，Python，run_app.py</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="mod">识别线程<small>dual_inference.py</small></div><div class="mod">传感器线程<small>sensor_worker.py</small></div>
+            <div class="mod core" style="grid-column:1/-1">SafetyEngine：规则 R1–R9 → 交叉验证 → 温度预测<small>engine.py / state_machine.py / cross_check.py / world_model.py</small></div>
+            <div class="mod">事件中心<small>语音、灯、截图、SQLite</small></div><div class="mod">安全助手<small>只读工具</small></div>
+            <div class="mod">实验台小屏<small>kiosk.py（Qt）</small></div><div class="mod">本机控制台<small>FastAPI :8180</small></div>
+          </div></div>
+        <div class="wire in" style="left:1230px;top:290px;width:150px;--i:3">HTTP<i></i>上报快照<br>取回阈值、指令</div>
+        <div class="tier-box sheet in" style="left:1390px;width:210px;--i:3"><h3>总后台</h3><span class="meta">run_center.py</span>
+          <div class="mod">FastAPI<small>:8200</small></div><div class="mod">SQLite<small>账号、区域、指令、审计</small></div><div class="mod">原生 JS 前端<small>无构建</small></div></div>
       </div>
-      <div class="abs room glass in" style="--i:1"><div class="blur">
-        <div class="desk" style="left:80px;top:120px"></div><div class="desk" style="left:400px;top:120px"></div><div class="desk" style="left:720px;top:120px"></div>
-        <div class="desk" style="left:80px;top:360px"></div><div class="desk" style="left:400px;top:360px"></div><div class="desk" style="left:720px;top:360px"></div>
-        <div class="who" style="left:150px;top:230px"></div><div class="who" style="left:480px;top:470px"></div><div class="who" style="left:800px;top:230px"></div></div></div>
-      <div class="abs lens in" style="--i:3"><p>烧杯还是量筒？<br>离桌边多远？<br>热源多少度？</p></div>
+      <p class="abs small in" style="left:160px;top:860px;--i:4">安全判断不依赖任何界面：小屏、本机控制台和总后台都只读取 SafetyEngine.snapshot()。</p>
     </section>
-
-    <section class="beat" data-ch="1" aria-label="防患于未然">
-      <div class="abs" style="left:200px;top:360px;width:1500px">
-        <h2 class="hd h-xxl in" style="--i:0">防患于未然</h2>
-        <p class="lead in" style="margin-top:34px;--i:1">在事故发生之前识别风险：先在现场提醒操作者；风险继续升级，由控制盒直接切断加热电源。</p>
+    <section class="beat" data-ch="1" aria-label="调用链">
+      <h2 class="abs hd h-m in" style="left:160px;top:110px;--i:0">一次判断：三个触发源，一条调用链</h2>
+      <div class="abs code in" style="left:160px;top:230px;width:840px;--i:1">
+        <div class="cap"><b>SafetyEngine.__init__</b>src/core/engine.py<span class="ln">L104–112 节选，注释简写</span></div>
+        <pre data-lang="py"># 每一帧识别结果
+self.inference_thread.update_frames_signal.connect(self._on_frames)
+# 每一次控制盒遥测
+self.sensor_worker.sensor_data_updated.connect(self._on_sensor)
+# 每秒一次：摄像头全部掉线时也照常判断
+self._tick = QTimer(self)
+self._tick.timeout.connect(self._on_tick)
+self._tick.start(1000)</pre></div>
+      <div class="abs kv in" style="left:160px;top:620px;width:840px;grid-template-columns:170px 1fr;font-size:23px;--i:2">
+        <div class="k">线程边界</div><div class="v">识别、串口各在后台线程，结果经 Qt 信号回到主线程再判断</div>
+        <div class="k">帧队列</div><div class="v">maxsize=2，满了丢最旧的（put_latest），判断总用最新一帧</div>
+        <div class="k">网页线程</div><div class="v">不碰 numpy 画面，只取 latest_jpeg() 编码好的字节</div>
       </div>
-      <div class="abs flow3 in" style="left:200px;top:840px;--i:2"><div class="step">1　识别风险</div><div class="arr"></div><div class="step">2　现场提醒</div><div class="arr"></div><div class="step">3　硬件断电</div></div>
+      <div class="abs pipe in" style="left:1060px;top:230px;width:700px;--i:3">
+        <div class="p core"><code>_evaluate()</code>每次触发都跑</div>
+        <div class="p sub"><code>state_machine.evaluate()</code>规则 R1–R9</div>
+        <div class="p sub"><code>world_model.update()</code>温度预测</div>
+        <div class="p sub"><code>events.update()</code>事件、语音、灯、截图、SQLite</div>
+        <div class="p sub"><code>send_power_off()</code>需要断电时</div>
+        <div class="p sub"><code>serial.feed()</code>最后一步：喂心跳</div>
+        <div class="p core"><code>update_risk()</code>每秒：交叉验证三级 + 三层定级</div>
+        <div class="p core"><code>snapshot()</code>小屏、本机控制台、总后台都只读它</div>
+      </div>
+      <p class="abs small in" style="left:160px;top:930px;--i:4">断电只由规则执行；交叉验证、温度预测和安全助手只影响提醒，不参与断电。</p>
     </section>
-
-    <!-- ============ 识别 ============ -->
-    <section class="beat" data-ch="2" aria-label="双摄分工">
-      <h2 class="abs hd h-m in" style="left:160px;top:130px;--i:0">两路摄像头分工：全景看人，台面看器皿</h2>
-      <div class="abs frame sheet in" style="left:160px;top:270px;width:780px;height:640px;--i:1">
-        <div class="top"><span class="hd h-s">全景摄像头</span><span class="small">人员模型，12 类</span></div>
-        <div class="scene"><svg width="100%" height="100%" viewBox="0 0 700 270" aria-hidden="true"><circle cx="350" cy="96" r="46" fill="#C9CEE2"/><rect x="262" y="150" width="176" height="140" rx="60" fill="#D7DBEA"/></svg>
-          <div class="box r" style="left:296px;top:62px;width:110px;height:44px"><span>No googles</span></div>
-          <div class="box g" style="left:262px;top:156px;width:176px;height:110px"><span style="top:auto;bottom:-40px">Lab Coat</span></div></div>
+    <section class="beat" data-ch="2" aria-label="类别映射">
+      <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">两路摄像头、两个模型：类别名怎么变成事件</h2>
+      <div class="abs frame sheet in" style="left:160px;top:240px;width:760px;height:300px;--i:1">
+        <div class="top"><span class="hd h-s">全景摄像头</span><span class="small num">ppe_best，12 类</span></div>
         <div class="chips"><span class="chip">护目镜</span><span class="chip">手套</span><span class="chip">实验服</span><span class="chip">口罩</span><span class="chip">头罩</span><span class="chip neg">以上五项的未佩戴类</span><span class="chip warn">进食</span><span class="chip warn">饮水</span></div>
+        <p class="small">模型没有 person 类：检出任意一类装备即视为有人</p>
       </div>
-      <div class="abs frame sheet in" style="left:980px;top:270px;width:780px;height:640px;--i:2">
-        <div class="top"><span class="hd h-s">台面摄像头</span><span class="small">器皿模型，14 类</span></div>
-        <div class="scene"><svg width="100%" height="100%" viewBox="0 0 700 270" aria-hidden="true"><rect x="0" y="210" width="700" height="60" fill="#DDE1EE"/>
-          <path d="M190 90 h120 v118 a14 14 0 0 1 -14 14 h-92 a14 14 0 0 1 -14 -14z" fill="rgba(141,155,232,.35)" stroke="#9AA4D6" stroke-width="3"/><rect x="196" y="150" width="108" height="64" rx="8" fill="rgba(92,107,192,.25)"/>
-          <rect x="470" y="40" width="54" height="172" rx="8" fill="rgba(141,155,232,.25)" stroke="#9AA4D6" stroke-width="3"/><path d="M478 70 h18 M478 100 h18 M478 130 h18 M478 160 h18" stroke="#9AA4D6" stroke-width="3"/></svg>
-          <div class="box g" style="left:180px;top:82px;width:140px;height:146px"><span>Beaker</span></div>
-          <div class="box" style="left:460px;top:32px;width:74px;height:188px"><span>Measuring Cylinder</span></div></div>
+      <div class="abs frame sheet in" style="left:160px;top:570px;width:760px;height:340px;--i:2">
+        <div class="top"><span class="hd h-s">台面摄像头</span><span class="small num">chem_best，14 类</span></div>
         <div class="chips"><span class="chip">烧杯</span><span class="chip">锥形瓶</span><span class="chip">圆底烧瓶</span><span class="chip">平底烧瓶</span><span class="chip">梨形瓶</span><span class="chip">试管</span><span class="chip">量筒</span><span class="chip">容量瓶</span><span class="chip">滴定管</span><span class="chip">移液管</span><span class="chip">试剂瓶</span><span class="chip">洗瓶</span><span class="chip">漏斗</span><span class="chip">滴定装置</span></div>
       </div>
-      <p class="abs small in" style="left:160px;top:940px;--i:3">检测框标签为模型原始类别名。两路画面成对读取，在同一个处理函数里依次送入两个模型。</p>
+      <div class="abs code in" style="left:980px;top:240px;width:780px;--i:3">
+        <div class="cap"><b>PPE_VIOLATION_KINDS</b>dual_inference.py<span class="ln">L117–126</span></div>
+        <pre data-lang="py">PPE_VIOLATION_KINDS = {
+    "no googles": ("ppe_goggles", "未佩戴护目镜"),
+    "no goggles": ("ppe_goggles", "未佩戴护目镜"),
+    "no lab coat": ("ppe_coat", "未穿实验服"),
+    "no gloves": ("ppe_gloves", "未佩戴手套"),
+    "no mask": ("ppe_mask", "未佩戴口罩"),
+    "no head mask": ("ppe_headmask", "未佩戴头罩"),
+    "eating": ("eating", "实验区饮食"),
+    "drinking": ("eating", "实验区饮食"),
+}</pre></div>
+      <div class="abs code in" style="left:980px;top:640px;width:780px;--i:4">
+        <div class="cap"><b>器皿分组</b>src/core/cross_check.py<span class="ln">L22–23</span></div>
+        <pre data-lang="py" style="font-size:16px">HEATABLE = {"beaker", "conical flask", "flat bottom flask",
+            "round bottom flask", "pear shaped flask", "test tube"}
+NON_HEATABLE = {"volumetric flask", "measuring cylinder",
+                "reagent bottle", "burette", "pipette", "wash bottle"}</pre></div>
+      <p class="abs small in" style="left:980px;top:880px;width:780px;--i:5">训练集把护目镜拼成了 googles，映射表两种拼写都收；表里没有的「no xxx」类按规则自动生成 ppe_xxx 事件。</p>
     </section>
-
     <section class="beat" data-ch="2" aria-label="模型指标">
       <h2 class="abs hd h-m in" style="left:160px;top:130px;--i:0">YOLO11n 微调，各约 2.59 M 参数</h2>
       <p class="abs small in" style="left:160px;top:212px;--i:0">指标为 best.pt 所在轮次（人员模型第 77 轮，器皿模型第 50 轮）的验证集检测指标，数据来自 models/model_card.json</p>
       <div class="abs frame sheet in" id="mPpe" style="left:160px;top:270px;width:780px;height:660px;--i:1"></div>
       <div class="abs frame sheet in" id="mChem" style="left:980px;top:270px;width:780px;height:660px;--i:2"></div>
     </section>
-
+    <section class="beat" data-ch="2" aria-label="部署">
+      <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">部署：按 RKNN → ONNX → .pt 加载，失败自动回退</h2>
+      <div class="abs code in" style="left:160px;top:230px;width:980px;--i:1">
+        <div class="cap"><b>DualInferenceSystem._load_model</b>dual_inference.py<span class="ln">L292–313 节选，注释简写</span></div>
+        <pre data-lang="py">for path in paths:          # 按 vision.prefer_format 排好的候选
+    if path.endswith("_rknn_model") and not ON_ROCKCHIP:
+        continue
+    try:
+        model = YOLO(path, task="detect")
+        if path.endswith("_rknn_model"):
+            imgsz = int(cfg("vision.imgsz", 640))
+            # 第一次推理才真正加载 NPU，先试跑一次，失败就换下一种格式
+            model(np.zeros((imgsz, imgsz, 3), np.uint8), verbose=False, imgsz=imgsz)
+            self._fixed_imgsz = imgsz
+        if err:
+            events.log("NPU 模型没加载上", ..., kind="model")
+        return model, model.names
+    except Exception as e:
+        err = str(e)</pre></div>
+      <div class="abs code in" style="left:1180px;top:230px;width:580px;--i:2">
+        <div class="cap"><b>put_latest</b>dual_inference.py<span class="ln">L145–155，注释简写</span></div>
+        <pre data-lang="py">def put_latest(q, item):
+    # 队列满时丢弃最旧的元素
+    while True:
+        try:
+            q.put_nowait(item)
+            return
+        except queue.Full:
+            try:
+                q.get_nowait()
+            except queue.Empty:
+                pass</pre></div>
+      <div class="abs kv in" style="left:1180px;top:680px;width:580px;grid-template-columns:190px 1fr;font-size:23px;--i:3">
+        <div class="k">NPU 单帧推理</div><div class="v"><span class="num">120 ms</span> 人员 / <span class="num">116 ms</span> 器皿</div>
+        <div class="k">版本一致</div><div class="v">导出工具、板上运行时、librknnrt 均为 2.3.2</div>
+        <div class="k">输入尺寸</div><div class="v">导出时固定 640，推理必须同尺寸</div>
+      </div>
+      <p class="abs small in" style="left:160px;top:900px;width:980px;--i:4">RK3588 实测，FP16；tools/check_npu.py 对比 NPU 与 .pt 的检测结果一致。NPU 加载失败时改用 .pt（CPU），并写一条事件，现场能看到。</p>
+    </section>
     <section class="beat" data-ch="2" aria-label="从检测框到事件">
       <h2 class="abs hd h-m in" style="left:160px;top:130px;--i:0">从检测框到事件：时间窗口投票</h2>
       <div class="abs code in" style="left:160px;top:260px;width:900px;--i:1">
@@ -378,18 +485,16 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
           <div class="k">最少帧数</div><div class="v num">4</div>
         </div>
         <p class="body in" style="margin-top:26px;--i:3">确认和解除用两个阈值，形成滞回，单帧误检不会触发提醒，事件也不会在边界上反复跳变。</p>
-        <div class="kv in" style="margin-top:36px;--i:4">
-          <div class="k">NPU 单帧推理</div><div class="v"><span class="num">120 ms</span> 人员 / <span class="num">116 ms</span> 器皿</div>
-          <div class="k">模型格式</div><div class="v">RKNN → ONNX → .pt 依次回退</div>
+        <div class="kv in" style="margin-top:36px;grid-template-columns:150px 1fr;--i:4">
+          <div class="k">人员在场</div><div class="v">人员模型任一类检出即视为有人</div>
+          <div class="k">无人值守</div><div class="v">连续 <span class="num">15 s</span> 无检出（presence.absent_seconds）</div>
+          <div class="k">画面无效</div><div class="v">黑屏、无摄像头、演示数据时不判断无人</div>
         </div>
-        <p class="small in" style="margin-top:14px;--i:5">RK3588 实测，rknn-toolkit2 2.3.2，FP16；tools/check_npu.py 对比检测结果与 .pt 一致</p>
       </div>
     </section>
-
-    <!-- ============ 面向学生 ============ -->
     <section class="beat" data-ch="3" aria-label="吃苹果的同学" id="bApple">
       <h2 class="abs hd h-l in" style="left:160px;top:120px;--i:0">演示：吃苹果的同学</h2>
-      <p class="abs lead in" style="left:160px;top:232px;--i:1">摘下头罩、护目镜、口罩，在实验台前吃苹果。</p>
+      <div class="abs chain in" style="left:160px;top:236px;--i:1"><span>检测框 no googles</span><i></i><span>TemporalVoter 确认</span><i></i><span>events.update 上升沿</span><i></i><span>_play_voice 选语气</span><i></i><span>PLAY_VOICE 0x03，曲目 1</span></div>
       <div class="abs kiosk glass in" style="--i:1"><div class="kscreen">
         <div class="kbar" id="kBar"><span id="kState">正常</span><small>实验台小屏</small></div>
         <div class="kbody">
@@ -399,10 +504,10 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
         </div>
         <div class="kfoot"><span>状态</span><span>画面</span><span>记录</span><span>静音 60s</span><span>呼叫教师</span><span>断电</span></div></div></div>
       <p class="abs small in" style="left:166px;top:904px;--i:2">小屏界面示意，按当前小屏布局绘制</p>
-      <div class="abs bubble" id="bub1" style="left:1080px;top:400px"><div class="who"><span class="lv y" style="height:34px;font-size:18px"><i></i>温和语气</span>语音提示</div><q>同学，记得戴好护目镜哦，眼睛只有一双。</q></div>
-      <div class="abs bubble" id="bub2" style="left:1080px;top:640px"><div class="who"><span class="lv y" style="height:34px;font-size:18px"><i></i>温和语气</span>语音提示</div><q>实验区不能吃东西喝水哦，请到室外再吃。</q></div>
+      <p class="abs small in" style="left:1080px;top:880px;width:680px;--i:3">语气由 events._play_voice() 决定：紧急事件或交叉验证为高危时用严厉语气，其余温和；同一事件解除后 10 s 内再出现算同一次，不重复播报。</p>
+      <div class="abs bubble" id="bub1" style="left:1080px;top:400px"><div class="who"><span class="lv y" style="height:34px;font-size:18px"><i></i>温和语气</span><span class="num">ppe_goggles，曲目 1</span></div><q>同学，记得戴好护目镜哦，眼睛只有一双。</q></div>
+      <div class="abs bubble" id="bub2" style="left:1080px;top:640px"><div class="who"><span class="lv y" style="height:34px;font-size:18px"><i></i>温和语气</span><span class="num">eating，曲目 6</span></div><q>实验区不能吃东西喝水哦，请到室外再吃。</q></div>
     </section>
-
     <section class="beat" data-ch="3" aria-label="学生是第一用户">
       <div class="abs" style="left:160px;top:200px;width:1600px">
         <h2 class="hd h-xl in" style="--i:0">学生是第一用户</h2>
@@ -411,21 +516,78 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
       <figure class="abs real glass in" style="left:1100px;top:150px;width:660px;--i:2"><img src="img/kiosk-warning.png" alt="实验台小屏守护页：加热中无人值守，预测即将干烧"><figcaption>实机截图：实验台小屏，加热中无人值守、预测即将干烧</figcaption></figure>
       <div class="abs facts" style="left:330px;top:620px;width:1430px">
         <div class="in" style="--i:2"><b>每张实验桌一台终端</b><span class="body">RK3588 开发板、两路 USB 摄像头、控制盒与传感器、小屏；硬件采购估算 1000–1350 元</span></div>
-        <div class="in" style="--i:3"><b>判断在本机完成</b><span class="body">识别、打分和断电不依赖网络；与总后台断开时终端照常工作，恢复后自动重连</span></div>
-        <div class="in" style="--i:4"><b>小屏按现场设计</b><span class="body">按钮不小于 64 px，戴手套可操作；状态同时用颜色、形状和文字表示</span></div>
+        <div class="in" style="--i:3"><b>断网照常工作</b><span class="body">识别、打分和断电都在本机；连不上总后台只记一条，恢复后自动重新上报</span></div>
+        <div class="in" style="--i:4"><b>小屏按现场设计</b><span class="body">800×480 基准自适应，按钮 ≥ 64 px；0.5 s 刷新、不做动画，不和识别抢 CPU</span></div>
       </div>
     </section>
-
     <section class="beat" data-ch="3" aria-label="风险分三级" id="bLevels">
-      <h2 class="abs hd h-m in" style="left:160px;top:130px;--i:0">第一个分叉：风险分三级</h2>
-      <p class="abs body in" style="left:160px;top:222px;width:1500px;--i:1">交叉验证（多源规则打分）：人员模型、器皿模型、传感器和温度预测的结果合在一起计分，30 分为中危界，70 分为高危界，可按区域调整。</p>
-      <div class="abs axis in" style="--i:1"></div>
-      <span class="tick in" style="left:240px;--i:1">0</span><span class="tick in" style="left:672px;--i:1">30</span><span class="tick in" style="left:1248px;--i:1">70</span><span class="tick in" style="left:1680px;--i:1">100</span>
-      <div class="abs case sheet" style="left:240px;top:680px"><span class="lv g"><i></i>低危　15 分</span><p>未加热，整理器皿时未戴手套</p><span class="say">温和提示：佩戴手套</span></div>
-      <div class="abs case sheet" style="left:740px;top:680px"><span class="lv y"><i></i>中危　65 分</span><p>加热中台面有量筒，且未戴护目镜</p><span class="say">移出量器，改用烧杯或锥形瓶加热</span></div>
-      <div class="abs case sheet" style="left:1240px;top:680px"><span class="lv r"><i></i>高危　100 分</span><p>越过沸点仍在升温，液体可能已烧干</p><span class="say">严厉语气：立即降低火力或补充液体</span></div>
+      <h2 class="abs hd h-m in" style="left:160px;top:110px;--i:0">第一个分叉：交叉验证打分，分三级</h2>
+      <div class="abs code in" style="left:160px;top:210px;width:1000px;--i:1">
+        <div class="cap"><b>assess()</b>src/core/cross_check.py<span class="ln">L92–127 节选</span></div>
+        <pre data-lang="py" style="font-size:16px">elif "WARNING" in ev_levels:
+    add("规则引擎", "存在警告事件", 40)
+if heating and present is False:
+    add("人员 × 传感器", "正在加热但台前无人", 70, "立即回到实验台，或关闭热源")
+for k in missing:
+    name = PPE_NAMES[k]
+    if heating and k in ("ppe_goggles", "ppe_gloves"):
+        add("人员 × 传感器", f"加热中未佩戴{name}（飞溅 / 烫伤风险）", 35 if boiling else 30, ...)
+    elif items and k in ("ppe_goggles", "ppe_gloves", "ppe_coat"):
+        add("人员 × 器皿", f"台面有器皿时未佩戴{name}", 15, f"佩戴{name}")
+if heating and non_heatable:
+    add("器皿 × 传感器", "加热时台面有不可加热量器…", 35, "移出量器，改用烧杯或锥形瓶加热")
+if wm_risk >= 0.6:
+    add("温度预测", f"干烧风险分 {wm_risk:.2f}", 70, "立即降低火力或补充液体")
+score = min(100, sum(f["points"] for f in factors))
+level = "high" if score >= high_score else "mid" if score >= mid_score else "low"</pre></div>
+      <div class="abs kv in" style="left:1210px;top:210px;width:550px;grid-template-columns:110px 1fr;font-size:22px;--i:2">
+        <div class="k">输入</div><div class="v">人员、器皿、温度预测、事件等级合成的一个字典</div>
+        <div class="k">输出</div><div class="v">level、score、scene，以及每条依据的来源、分值和处置动作</div>
+        <div class="k">性质</div><div class="v">纯函数，不参与断电；测试直接喂字典</div>
+        <div class="k">分界</div><div class="v"><span class="num">30 / 70</span>，可按区域调整，高危界须比中危高 10 分以上</div>
+      </div>
+      <div class="abs axis in" style="--i:3"></div>
+      <span class="tick in" style="left:240px;--i:3">0</span><span class="tick in" style="left:672px;--i:3">30</span><span class="tick in" style="left:1248px;--i:3">70</span><span class="tick in" style="left:1680px;--i:3">100</span>
+      <div class="abs case sheet" style="left:240px;top:808px"><span class="lv g"><i></i>低危　15 分</span><p>未加热，整理器皿时未戴手套</p><span class="pts">15 台面有器皿时未佩戴手套</span></div>
+      <div class="abs case sheet" style="left:740px;top:808px"><span class="lv y"><i></i>中危　65 分</span><p>加热中台面有量筒，未戴护目镜</p><span class="pts">35 不可加热量器 + 30 加热中未戴护目镜</span></div>
+      <div class="abs case sheet" style="left:1240px;top:808px"><span class="lv r"><i></i>高危　100 分</span><p>越过沸点仍在升温</p><span class="pts">70 干烧风险分 + 40 警告事件，封顶 100</span></div>
     </section>
-
+    <section class="beat" data-ch="3" aria-label="规则与预测">
+      <h2 class="abs hd h-m in" style="left:160px;top:110px;--i:0">断电只看规则；温度预测只负责提前预警</h2>
+      <div class="abs rtab in" style="left:160px;top:220px;width:860px;--i:1">
+        <div class="h">编号</div><div class="h">条件（config.yaml → rules）</div><div class="h">结果</div>
+        <div class="id">R1</div><div>热源 ≥ 120℃</div><div class="cut">紧急，断电</div>
+        <div class="id">R2</div><div>≥ 80℃ 且升温 ≥ 2℃/s</div><div class="warn">警告</div>
+        <div class="id">R3</div><div>加热中（≥ 50℃）无人，持续 60 s</div><div class="cut">警告 → 断电</div>
+        <div class="id">R4</div><div>无测温 + 可加热器皿 + 无人 + 环境 &gt; 55℃</div><div class="cut">紧急，断电</div>
+        <div class="id">R5</div><div>烟雾读数 ≥ 1800</div><div class="cut">紧急，断电</div>
+        <div class="id">R6</div><div>湿度 &gt; 80%</div><div class="warn">警告</div>
+        <div class="id">R7</div><div>环境温度 &gt; 40℃</div><div class="warn">警告</div>
+        <div class="id">R8</div><div>加热中台面有容量瓶、量筒等量器</div><div class="note">提醒</div>
+        <div class="id">R9</div><div>越过沸点仍升温，预计 ≤ 90 s 到 120℃</div><div class="warn">警告，不断电</div>
+      </div>
+      <p class="abs small in" style="left:160px;top:830px;width:860px;--i:2">每条规则写成 add(kind, level, title, message, cut=…)，只有 cut=True 的规则会下发断电。</p>
+      <div class="abs code in" style="left:1070px;top:220px;width:690px;--i:3">
+        <div class="cap"><b>_predict</b>src/core/world_model.py<span class="ln">L130–176 节选</span></div>
+        <pre data-lang="py" style="font-size:16px"># 一阶模型 dT/dt = α + β·T，β = -1/τ，T∞ = -α/β
+# 2 秒分箱后差分求导，抑制噪声
+if len(d_t) >= 4 and slope > 0.02 and not beyond_boil:
+    lf = self._linfit(d_t, d_v)
+    if lf is not None:
+        beta, alpha = lf
+        if beta < -1e-4:
+            t_inf_c = -alpha / beta
+            tau_c = -1.0 / beta
+...
+if temp < boil_hi:   # 低于沸点：液体还在
+    eta_boil = time_to(boil_lo) if temp < boil_lo else None
+else:                # 越过沸点仍升温：可能已烧干
+    eta = time_to(dry_c)</pre></div>
+      <div class="abs kv in" style="left:1070px;top:740px;width:690px;grid-template-columns:150px 1fr;font-size:22px;--i:4">
+        <div class="k">拟合窗口</div><div class="v">最近 60 s；越过沸点后只用最近 15 s 外推</div>
+        <div class="k">沸腾平台</div><div class="v">92–104℃ 且 15 s 斜率 &lt; 0.05℃/s</div>
+      </div>
+    </section>
     <section class="beat" data-ch="3" aria-label="三层上报" id="bTiers">
       <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">第二个分叉：同一事件，三层各自定级</h2>
       <div class="abs colhd in" style="left:880px;--i:1">学生端<small>语音提示、小屏</small></div>
@@ -439,17 +601,55 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
       </div>
       <p class="abs body in" style="left:160px;top:910px;width:1600px;--i:4">学生端计入全部因子；实验室老师只计入加热、温度、烟雾、断电和学生呼叫，行为违规仅作知会；实验楼只计入断电锁定和紧急事件。</p>
     </section>
+    <section class="beat" data-ch="3" aria-label="分层上报实现">
+      <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">分层上报的实现：同一份打分，三次过滤</h2>
+      <div class="abs code in" style="left:160px;top:240px;width:1000px;--i:1">
+        <div class="cap"><b>tiers()</b>src/core/cross_check.py<span class="ln">L166–191 节选</span></div>
+        <pre data-lang="py"># ---- 实验室老师 ----
+reasons = [
+    {"text": f["text"], "points": f["points"]} for f in r["factors"]
+    if f["source"] not in BEHAVIOR_SOURCES and f["source"] != "规则引擎"]
+if latched:
+    reasons.append({"text": "已断电锁定，需到场排查", "points": 100})
+elif "CRITICAL" in hz: ...
+elif "WARNING" in hz: ...
+if d.get("called"):
+    reasons.append({"text": "学生在终端上呼叫教师", "points": 40})
+t_level = _level(t_score, mid_score, high_score)
+notes = [f["text"] for f in r["factors"] if f["source"] in BEHAVIOR_SOURCES]
 
+# ---- 实验楼 ----
+if latched or "CRITICAL" in hz:
+    b_level = "high"
+elif t_level == "high":
+    b_level = "mid"</pre></div>
+      <div class="abs" style="left:1220px;top:240px;width:540px">
+        <div class="kv in" style="grid-template-columns:150px 1fr;--i:2">
+          <div class="k">学生端</div><div class="v">全部因子，即 risk.level</div>
+          <div class="k">实验室</div><div class="v">去掉行为因子；hz 只含安全规则事件（HAZARD_KINDS）</div>
+          <div class="k">实验楼</div><div class="v">只看断电锁定与紧急事件</div>
+        </div>
+        <p class="body in" style="margin-top:26px;--i:3">三层等级随快照字段 risk.tiers 上报；总后台按账号角色选默认视角，旧版终端没有该字段时有兜底。分层只影响上报，不参与断电。</p>
+      </div>
+    </section>
     <section class="beat" data-ch="3" aria-label="安全助手">
       <figure class="abs real glass in" style="left:160px;top:230px;width:660px;--i:1"><img src="img/advice-card.png" alt="本机控制台事件卡片：预测即将干烧，附处理建议的原因、处置和手册依据"><figcaption>实机截图：本机控制台事件卡片，处理建议由规则模板生成</figcaption></figure>
       <div class="abs" style="left:1000px;top:250px;width:760px">
         <h2 class="hd h-m in" style="--i:0">安全助手：只读，只建议</h2>
         <p class="body in" style="margin-top:24px;--i:1">读取交叉验证结果和安全手册（BM25 检索），生成原因、步骤和条款引用。工具表只有 5 个只读工具，没有电源控制接口。</p>
-        <div class="routes in" style="margin-top:34px;--i:2"><div>远程通义千问<small>联网</small></div><div>本地 Ollama<small>局域网</small></div><div>规则模板<small>离线兜底</small></div></div>
+        <div class="code in" style="margin-top:30px;--i:2">
+          <div class="cap"><b>TOOLS</b>src/agent/agent.py<span class="ln">L47–66 节选</span></div>
+          <pre data-lang="py">TOOLS = [                       # 全部只读
+    {"name": "get_status", ...},           # 状态、遥测、锁定
+    {"name": "get_risk_assessment", ...},  # 交叉验证结果
+    {"name": "get_recent_events", ...},
+    {"name": "get_forecast", ...},         # 温度预测
+    {"name": "search_manual", ...},        # 手册检索
+]</pre></div>
+        <p class="small in" style="margin-top:18px;--i:3">线路 agent.route = auto：远程通义千问 → 本地 Ollama；都不可用时退回规则模板。</p>
       </div>
     </section>
-
-    <section class="beat" data-ch="3" aria-label="只断不通" id="bCut">
+    <section class="beat" data-ch="4" aria-label="只断不通" id="bCut">
       <h2 class="abs hd h-m in" style="left:160px;top:130px;--i:0">最后一道防线：只断不通</h2>
       <div class="abs seq in" style="--i:1">
         <div class="node">开发板<small>规则判定需断电</small></div>
@@ -466,51 +666,7 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
         <div class="wide in" style="--i:5"><span class="hd h-s" style="white-space:nowrap">恢复供电</span><span class="body">软件和总后台都没有通电接口。复电只能在现场长按控制键 2 秒，控制盒先复查温度和烟雾，超标则拒绝。</span></div>
       </div>
     </section>
-
-    <!-- ============ 总后台 ============ -->
-    <section class="beat" data-ch="4" aria-label="总后台三个视角" id="bPlan">
-      <h2 class="abs hd h-m in" style="left:160px;top:110px;--i:0">总后台：同一栋楼，三个视角</h2>
-      <div class="abs plan glass in" style="--i:1" id="plan">
-        <div class="abs" style="left:40px;top:40px;display:flex;flex-direction:column;gap:6px"><span class="hd h-s" id="pvName">学生端视角</span><span class="small" id="pvNote">与实验台上的提醒一致</span></div>
-        <div class="abs seg3" style="right:40px;top:44px" id="pvSeg"><span>学生端</span><span>实验室</span><span>实验楼</span></div>
-        <div class="abs tally" style="right:40px;top:116px" id="pvTally"></div>
-      </div>
-      <p class="abs small in" style="left:160px;top:972px;--i:2">演示数据：tools/center_demo.py，一栋三层楼、13 台模拟终端</p>
-    </section>
-
-    <section class="beat" data-ch="4" aria-label="分层管理">
-      <h2 class="abs hd h-m in" style="left:160px;top:130px;--i:0">一套后台，分层管理</h2>
-      <div class="abs mgmt">
-        <div class="in" style="--i:1"><h3>账号与授权</h3><span class="body">管理员管理整栋楼；教师只能查看和管理被授权的楼栋、房间或实验桌。</span></div>
-        <div class="in" style="--i:2"><h3>阈值方案</h3><span class="body">按区域下发规则阈值；终端再按本机控制盒硬上限校验，超限项不生效并回报原因。</span></div>
-        <div class="in" style="--i:3"><h3>语音包</h3><span class="body">每类提示配温和、严厉两种语气；可用 TTS 生成，也可上传教师本人录音（需本人同意）。</span></div>
-        <div class="in" style="--i:4"><h3>复核与审计</h3><span class="body">教师在终端标注报警是否正确，总后台汇总现场准确率；所有操作写入审计记录。</span></div>
-      </div>
-      <figure class="abs shot glass in" style="margin:0;--i:2"><img src="img/center-floorplan.png" alt="总后台总览页：处置队列与按楼层排布的实验桌平面图"><figcaption>总后台总览页截图（演示数据）</figcaption></figure>
-    </section>
-
-    <!-- ============ 工程实现 ============ -->
-    <section class="beat" data-ch="5" aria-label="系统组成">
-      <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">系统组成：三个独立程序</h2>
-      <div class="abs arch">
-        <div class="tier-box sheet in" style="left:0;width:390px;--i:1"><h3>控制盒</h3><span class="meta">ESP32-S3，Arduino 固件</span>
-          <div class="mod">SHT30 温湿度<br>MLX90614 红外测温<br>MQ-2 烟雾</div><div class="mod">继电器（加热电源）<br>控制键、信号灯、蜂鸣器</div><div class="mod core">本地硬规则<small>150℃ / 2500 / 心跳 30 s</small></div></div>
-        <div class="wire in" style="left:400px;top:290px;width:150px;--i:2">USB 串口<i></i>AA 55 帧<br>CRC16</div>
-        <div class="tier-box sheet in" style="left:560px;width:660px;--i:2"><h3>实验台终端</h3><span class="meta">RK3588，Python，run_app.py</span>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div class="mod">识别线程<small>dual_inference.py</small></div><div class="mod">传感器线程<small>sensor_worker.py</small></div>
-            <div class="mod core" style="grid-column:1/-1">SafetyEngine：规则 R1–R9 → 交叉验证 → 温度预测<small>engine.py / state_machine.py / cross_check.py / world_model.py</small></div>
-            <div class="mod">事件中心<small>语音、灯、截图、SQLite</small></div><div class="mod">安全助手<small>只读工具</small></div>
-            <div class="mod">实验台小屏<small>kiosk.py（Qt）</small></div><div class="mod">本机控制台<small>FastAPI :8180</small></div>
-          </div></div>
-        <div class="wire in" style="left:1230px;top:290px;width:150px;--i:3">HTTP<i></i>上报快照<br>取回阈值、指令</div>
-        <div class="tier-box sheet in" style="left:1390px;width:210px;--i:3"><h3>总后台</h3><span class="meta">run_center.py</span>
-          <div class="mod">FastAPI<small>:8200</small></div><div class="mod">SQLite<small>账号、区域、指令、审计</small></div><div class="mod">原生 JS 前端<small>无构建</small></div></div>
-      </div>
-      <p class="abs small in" style="left:160px;top:860px;--i:4">安全判断不依赖任何界面：小屏、本机控制台和总后台都只读取 SafetyEngine.snapshot()。</p>
-    </section>
-
-    <section class="beat" data-ch="5" aria-label="判断驱动心跳">
+    <section class="beat" data-ch="4" aria-label="判断驱动心跳">
       <h2 class="abs hd h-m in" style="left:160px;top:110px;--i:0">程序卡死也能断电：心跳由安全判断驱动</h2>
       <div class="abs code in" style="left:160px;top:220px;width:880px;--i:1">
         <div class="cap"><b>① R3 加热中无人值守</b>src/core/state_machine.py<span class="ln">L250–260 节选</span></div>
@@ -545,8 +701,7 @@ if (smokeReady() &amp;&amp; smokeRaw >= SMOKE_LIMIT_RAW)   cutPower(CUT_SMOKE, E
 bool hot = !mlxOk || isnan(objC) || objC > WATCHDOG_HOT_C;   // 测不到温度时按"可能很热"保守处理
 if (relayOn &amp;&amp; millis() - lastHb > WATCHDOG_CUT_MS &amp;&amp; hot) cutPower(CUT_WATCHDOG, EV_WATCHDOG);</pre></div>
     </section>
-
-    <section class="beat" data-ch="5" aria-label="串口帧">
+    <section class="beat" data-ch="4" aria-label="串口帧">
       <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">串口协议：定长帧头 + CRC16 + ACK 重发</h2>
       <p class="abs small in" style="left:160px;top:210px;--i:0">示例：POWER_OFF 指令，原因码 4（执行上位机断电），115200 波特</p>
       <div class="abs bytes in" style="--i:1">
@@ -579,40 +734,65 @@ def build_frame(seq: int, cmd: int, payload: bytes = b"") -> bytes:
         <p class="small in" style="margin-top:16px;--i:5">接收端按帧头重新同步：长度非法或 CRC 错误的帧直接丢弃，不完整的帧留到下一次读取再拼接。</p>
       </div>
     </section>
-
-    <section class="beat" data-ch="5" aria-label="分层上报实现">
-      <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">分层上报的实现：同一份打分，三次过滤</h2>
-      <div class="abs code in" style="left:160px;top:240px;width:1000px;--i:1">
-        <div class="cap"><b>tiers()</b>src/core/cross_check.py<span class="ln">L166–191 节选</span></div>
-        <pre data-lang="py"># ---- 实验室老师 ----
-reasons = [
-    {"text": f["text"], "points": f["points"]} for f in r["factors"]
-    if f["source"] not in BEHAVIOR_SOURCES and f["source"] != "规则引擎"]
-if latched:
-    reasons.append({"text": "已断电锁定，需到场排查", "points": 100})
-elif "CRITICAL" in hz: ...
-elif "WARNING" in hz: ...
-if d.get("called"):
-    reasons.append({"text": "学生在终端上呼叫教师", "points": 40})
-t_level = _level(t_score, mid_score, high_score)
-notes = [f["text"] for f in r["factors"] if f["source"] in BEHAVIOR_SOURCES]
-
-# ---- 实验楼 ----
-if latched or "CRITICAL" in hz:
-    b_level = "high"
-elif t_level == "high":
-    b_level = "mid"</pre></div>
-      <div class="abs" style="left:1220px;top:240px;width:540px">
-        <div class="kv in" style="grid-template-columns:150px 1fr;--i:2">
-          <div class="k">学生端</div><div class="v">全部因子，即 risk.level</div>
-          <div class="k">实验室</div><div class="v">去掉行为因子；hz 只含安全规则事件（HAZARD_KINDS）</div>
-          <div class="k">实验楼</div><div class="v">只看断电锁定与紧急事件</div>
-        </div>
-        <p class="body in" style="margin-top:26px;--i:3">三层等级随快照字段 risk.tiers 上报；总后台按账号角色选默认视角，旧版终端没有该字段时有兜底。分层只影响上报，不参与断电。</p>
+    <section class="beat" data-ch="5" aria-label="总后台三个视角" id="bPlan">
+      <h2 class="abs hd h-m in" style="left:160px;top:110px;--i:0">总后台：同一栋楼，三个视角</h2>
+      <div class="abs plan glass in" style="--i:1" id="plan">
+        <div class="abs" style="left:40px;top:40px;display:flex;flex-direction:column;gap:6px"><span class="hd h-s" id="pvName">学生端视角</span><span class="small" id="pvNote">与实验台上的提醒一致</span></div>
+        <div class="abs seg3" style="right:40px;top:44px" id="pvSeg"><span>学生端</span><span>实验室</span><span>实验楼</span></div>
+        <div class="abs tally" style="right:40px;top:116px" id="pvTally"></div>
       </div>
+      <p class="abs small in" style="left:160px;top:972px;--i:2">演示数据：tools/center_demo.py，13 台模拟终端。视角即接口参数：GET /api/overview?tier=student | teacher | building</p>
     </section>
+    <section class="beat" data-ch="5" aria-label="接入协议">
+      <h2 class="abs hd h-m in" style="left:160px;top:110px;--i:0">终端接入：一个上报接口，指令只有断电和静音</h2>
+      <div class="abs node2 sheet in" style="left:160px;top:220px;--i:1"><b>实验台终端</b><span class="num">center_link.py</span></div>
+      <div class="abs node2 sheet in" style="left:1420px;top:220px;--i:1"><b>总后台</b><span class="num">center/app.py</span></div>
+      <div class="abs arrow2 in" style="left:520px;top:236px;width:880px;--i:2"><span>POST /api/node/report　X-Node-Token　每 2 s：snapshot、meta、acks</span><i></i></div>
+      <div class="abs arrow2 back in" style="left:520px;top:316px;width:880px;--i:2"><span>返回 profile（区域阈值）、commands、voice（语音包版本）</span><i></i></div>
+      <div class="abs code in" style="left:160px;top:440px;width:880px;--i:3">
+        <div class="cap"><b>node_report</b>center/app.py<span class="ln">L449–461 节选</span></div>
+        <pre data-lang="py">@app.post("/api/node/report")
+async def node_report(request: Request, n=Depends(node_auth)):
+    data = await body(request)
+    store.ack_commands(n["id"], data.get("acks") or {})
+    store.record_report(n["id"], ..., snap, meta)
+    prof = _resolved_rules(n["area_id"])
+    cmds = store.pending_commands(n["id"])
+    return {"profile": prof, "commands": [...],
+            "voice": _voice_pack(n["area_id"]), ...}</pre></div>
+      <div class="abs code in" style="left:1080px;top:440px;width:680px;--i:4">
+        <div class="cap"><b>指令白名单与执行</b>store.py L30、center_link.py<span class="ln">L145–155 节选</span></div>
+        <pre data-lang="py">COMMANDS = ("cut_power", "mute")
 
-    <section class="beat" data-ch="5" aria-label="约束写进测试">
+def run_command(self, c):
+    cmd, args = c.get("cmd"), c.get("args") or {}
+    if cmd == "cut_power":
+        return self.engine.cut_power(f"总后台·{who}")
+    if cmd == "mute":
+        until = self.engine.mute(...)
+        return ...
+    return "不支持的指令"   # 没有上电 / 解锁指令</pre></div>
+      <p class="abs small in" style="left:160px;top:900px;width:1600px;--i:5">执行结果在下一次上报的 acks 里回写；上报失败只记录，终端本机判断不受影响。</p>
+    </section>
+    <section class="beat" data-ch="5" aria-label="分层管理">
+      <h2 class="abs hd h-m in" style="left:160px;top:110px;--i:0">分层管理；下发的阈值在终端再校验一次</h2>
+      <div class="abs mgmt sm" style="top:220px;width:880px">
+        <div class="in" style="--i:1"><h3>账号与授权</h3><span class="body">管理员和教师两种角色；教师只能看、管被授权的楼栋、房间或实验桌</span><span class="src">users、grants</span></div>
+        <div class="in" style="--i:2"><h3>阈值方案</h3><span class="body">出厂预设打底，按区域逐级覆盖</span><span class="src">profiles</span></div>
+        <div class="in" style="--i:3"><h3>语音包</h3><span class="body">每类提示温和、严厉两种语气；TTS 或教师本人录音</span><span class="src">voice_assets、voice_map</span></div>
+        <div class="in" style="--i:4"><h3>复核与审计</h3><span class="body">报警复核汇总现场准确率；所有操作写入审计</span><span class="src">audit</span></div>
+      </div>
+      <div class="abs code in" style="left:160px;top:650px;width:880px;--i:5">
+        <div class="cap"><b>tunable_spec()</b>src/core/tunable.py<span class="ln">L38–44 节选</span></div>
+        <pre data-lang="py">spec = dict(TUNABLE)
+typ, lo, _, label, grp = spec["rules.dry_burn_c"]
+spec["rules.dry_burn_c"] = (typ, lo, float(hard_limit_c) - 5, ...)
+typ, lo, _, label, grp = spec["rules.smoke_raw"]
+spec["rules.smoke_raw"] = (typ, lo, int(smoke_limit_raw) - 100, ...)</pre></div>
+      <figure class="abs shot glass in" style="margin:0;top:220px;--i:2"><img src="img/center-floorplan.png" alt="总后台总览页：处置队列与按楼层排布的实验桌平面图"><figcaption>总后台总览页截图（演示数据）</figcaption></figure>
+      <p class="abs small in" style="left:1120px;top:780px;width:640px;--i:6">终端 apply_profile() 按本机控制盒硬上限（150℃ / 2500）重建白名单，超限项不生效，原因写进事件，并在下一次上报的 profile_errors 里回报。</p>
+    </section>
+    <section class="beat" data-ch="6" aria-label="约束写进测试">
       <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">设计约束写进自动测试</h2>
       <div class="abs code in" style="left:160px;top:240px;width:1000px;--i:1">
         <div class="cap"><b>只断不通、大模型不碰电闸</b>tests/test_platform.py<span class="ln">L173, L231</span></div>
@@ -635,16 +815,13 @@ check(not any(k in p for p in routes
         <p class="small in" style="margin-top:18px;--i:4">用例数为仓库文档记录；答辩前请在比赛电脑上重跑一遍。</p>
       </div>
     </section>
-
-    <section class="beat" data-ch="5" aria-label="实物运行">
+    <section class="beat" data-ch="6" aria-label="实物运行">
       <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">实物运行</h2>
       <figure class="abs photo in" style="left:160px;top:240px;width:840px;height:640px;margin:0;--i:1"><img src="img/photo-1.jpg" alt="" data-photo><div class="ph"><b>照片 1</b><span>放入 img/photo-1.jpg</span><span>建议：开发板 + 小屏 + 两路摄像头整机运行</span></div><figcaption>实验台终端整机运行</figcaption></figure>
       <figure class="abs photo in" style="left:1040px;top:240px;width:720px;height:310px;margin:0;--i:2"><img src="img/photo-2.jpg" alt="" data-photo><div class="ph"><b>照片 2</b><span>放入 img/photo-2.jpg</span><span>建议：控制盒与传感器接线</span></div><figcaption>控制盒与传感器</figcaption></figure>
       <figure class="abs photo in" style="left:1040px;top:570px;width:720px;height:310px;margin:0;--i:3"><img src="img/photo-3.jpg" alt="" data-photo><div class="ph"><b>照片 3</b><span>放入 img/photo-3.jpg</span><span>建议：小屏提醒或总后台联调画面</span></div><figcaption>现场提醒</figcaption></figure>
     </section>
-
-    <!-- ============ 结尾 ============ -->
-    <section class="beat" data-ch="6" aria-label="结尾" id="bEnd">
+    <section class="beat" data-ch="7" aria-label="结尾" id="bEnd">
       <div class="abs finale-board board glass"><div class="soc">RK3588</div><div class="port" style="left:34px;top:110px"></div><div class="port" style="left:34px;top:164px"></div><div class="port" style="right:34px;bottom:40px;width:100px"></div></div>
       <div class="ring glass" style="--k:0;left:220px;top:150px"><b>双摄识别</b><span>YOLO11n，人员 12 类，器皿 14 类</span></div>
       <div class="ring glass" style="--k:1;left:780px;top:110px"><b>交叉验证</b><span>多源规则打分，分低、中、高三级</span></div>
@@ -675,7 +852,7 @@ check(not any(k in p for p in routes
   ];
   var stage = document.getElementById('stage'), halo = document.getElementById('halo');
   var beats = Array.prototype.slice.call(document.querySelectorAll('.beat'));
-  var CHAPTERS = ['片头', '需求', '识别', '面向学生', '总后台', '工程实现', '结尾'];
+  var CHAPTERS = ['片头', '需求', '识别', '面向学生', '断电', '总后台', '验证', '结尾'];
   var RGB = { g: [22, 163, 98], y: [236, 152, 8], r: [224, 58, 50], n: [150, 157, 184] };
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -747,28 +924,30 @@ check(not any(k in p for p in routes
   function hideSats() { [1, 2].forEach(function (k) { O[k].to({ x: O[0].tgt.x, y: O[0].tgt.y, op: 0, r: 10 }, 700); }); }
 
   var B = [
-    { orb: { x: 960, y: 400, r: 64, c: 'g', glow: 1.2 }, note: '开场：不是又一套天花板监控，而是放在每张实验桌上的安全终端：识别风险、现场提醒、必要时由硬件断电。' },
-    { orb: { x: 362, y: 230, r: 40, c: 'n', glow: .2 }, note: '现有监控只记录已发生的事：事故发生时不能干预，事故发生前不能预警。' },
-    { orb: { x: 362, y: 230, r: 40, c: 'n', glow: .2 }, note: '俯拍看不清台面细节：器皿种类、离桌边距离、温度都分辨不出；几十路画面也不可能有人实时盯守。' },
-    { orb: { x: 250, y: 250, r: 46, c: 'g', glow: 1 }, note: '防患于未然：先识别风险并现场提醒；风险继续升级，由控制盒直接切断加热电源。' },
-    { orb: { x: 1756, y: 274, r: 16, c: 'g', glow: 1 }, note: '全景摄像头跑人员模型（12 类：五类防护及其未佩戴类、进食、饮水），台面摄像头跑器皿模型（14 类）。' },
-    { orb: { x: 1760, y: 150, r: 14, c: 'g', glow: 1 }, note: '两个模型都是 YOLO11n 微调。人员模型训练 80 轮、取第 77 轮权重，mAP@0.5 为 89.0%；器皿模型 50 轮，mAP@0.5 为 89.3%，mAP@0.5:0.95 为 73.7%。这是验证集上的检测指标，不是事故识别准确率。' },
-    { orb: { x: 1060, y: 260, r: 14, c: 'g', glow: 1 }, note: '检测结果先过时间窗口投票：3 s 窗口内命中帧占比 ≥60% 才确认，≤20% 才解除，单帧误检不会触发提醒。NPU 单帧推理人员 120 ms、器皿 116 ms。' },
-    { orb: { x: 213, y: 424, r: 17, c: 'g', glow: 1 }, enter: applePlay, note: '演示：摘下护目镜时温和提示；咬一口苹果再提示，小屏逐条列出要做的事；分数叠加后信号灯变红。' },
-    { orb: { x: 230, y: 860, r: 46, c: 'g', glow: 1.1 }, note: '学生是第一用户：目标是减少火灾和伤害。每张实验桌一台终端，判断在本机完成，断网也照常工作。' },
-    { orb: { x: 456, y: 560, r: 26, c: 'g', glow: 1 }, enter: levelsPlay, note: '第一个分叉：交叉验证是多源规则打分，不是机器学习里的交叉验证。30 分以下低危，70 分以上高危，低中危温和语气，高危严厉语气。' },
+    { orb: { x: 960, y: 400, r: 64, c: 'g', glow: 1.2 }, note: '开场：每张实验桌一台安全终端，由三个独立程序组成：控制盒固件、实验台终端、总后台。下面每一页都对应仓库里的具体模块。' },
+    { orb: { x: 362, y: 230, r: 40, c: 'n', glow: .2 }, note: '需求先翻译成工程约束：能断电而且程序坏了也能断，所以有独立的控制盒和固件硬规则；要事前预警，所以判断放在本机；要看清台面，所以加第二路摄像头和红外测温。' },
+    { orb: { x: 1196, y: 296, r: 14, c: 'g', glow: 1 }, note: '三个程序：控制盒固件、实验台终端 run_app.py、总后台 run_center.py。终端和控制盒走 USB 串口自定义帧，终端和总后台走 HTTP。安全判断集中在 SafetyEngine，所有界面只读快照。' },
+    { orb: { x: 1048, y: 254, r: 14, c: 'g', glow: 1 }, note: '判断有三个触发源：每帧识别结果、每次遥测、每秒一次定时器，摄像头掉线时也照常判断。每次都跑同一条调用链，最后一步才喂心跳；交叉验证每秒算一次，界面只读 snapshot。' },
+    { orb: { x: 1760, y: 240, r: 14, c: 'g', glow: 1 }, note: '人员模型 12 类、器皿模型 14 类。类别名通过映射表变成事件 kind，比如 no googles 变成 ppe_goggles；器皿按可加热、不可加热分组，供规则和交叉验证使用。' },
+    { orb: { x: 1760, y: 150, r: 14, c: 'g', glow: 1 }, note: '两个模型都是 YOLO11n 微调。人员模型训练 80 轮、取第 77 轮权重，mAP@0.5 为 89.0%；器皿模型 50 轮，mAP@0.5 为 89.3%。这是验证集上的检测指标，不是事故识别准确率。' },
+    { orb: { x: 1760, y: 230, r: 14, c: 'g', glow: 1 }, note: '部署按 RKNN、ONNX、.pt 的顺序尝试；RKNN 要先试跑一次才真正加载 NPU，失败就换下一种格式，并写一条事件。帧队列只保留最新的两帧，判断不会被积压的旧帧拖慢。NPU 单帧人员 120 ms、器皿 116 ms。' },
+    { orb: { x: 1060, y: 260, r: 14, c: 'g', glow: 1 }, note: '单帧检测结果不直接报警：3 s 窗口内命中帧占比 ≥60% 才确认，≤20% 才解除，有滞回。人员在场用装备检出代替 person 类，连续 15 s 无检出才算无人。' },
+    { orb: { x: 213, y: 424, r: 17, c: 'g', glow: 1 }, enter: applePlay, note: '演示：摘下头罩、护目镜、口罩吃苹果。检测框经投票确认，events.update 在上升沿播语音，曲目号来自 config.yaml，经串口 PLAY_VOICE 让控制盒播放。分数叠加后小屏和信号灯变红。' },
+    { orb: { x: 230, y: 860, r: 46, c: 'g', glow: 1.1 }, note: '学生是第一用户：提醒先发给台前的学生。每桌一台终端，断网也照常判断；小屏按现场设计，不做动画，不和识别抢 CPU。' },
+    { orb: { x: 456, y: 764, r: 22, c: 'g', glow: 1 }, enter: levelsPlay, note: '第一个分叉：交叉验证是多源规则打分，不是机器学习里的交叉验证。每条因子带来源和分值，相加封顶 100，30 分中危、70 分高危。三个例子的分数都能从代码里逐项算出来。' },
+    { orb: { x: 1070, y: 220, r: 14, c: 'y', glow: 1 }, note: '断电只看 R1 到 R9 这组确定的规则，只有 cut=True 的才下发断电。温度预测用一阶热平衡拟合，低于沸点只给沸腾时间；越过沸点还在升温，才给干烧倒计时，触发 R9 预警，不断电。' },
     { orb: { x: 880, y: 268, r: 24, c: 'r', glow: 1 }, enter: tiersPlay, note: '第二个分叉：同一事件三层各自定级。吃苹果对学生是高危，对老师只记知会，对实验楼不打扰；断电锁定三层都是最高。' },
-    { orb: { x: 1000, y: 214, r: 14, c: 'y', glow: 1 }, note: '安全助手读取打分结果和安全手册，写原因、步骤和条款；三条线路：通义千问、本地 Ollama、离线规则模板。工具表只有 5 个只读工具。' },
-    { orb: { x: 1610, y: 300, r: 16, c: 'r', glow: 1.2 }, enter: cutPlay, note: '断电链路：开发板发 POWER_OFF，控制盒断继电器回 ACK，0.25 s 超时重发，最多发送 3 次，往返中位 4.9 ms。控制盒另有 150℃、烟雾 2500、心跳 30 s 的本地硬规则。只断不通。' },
-    { orb: null, enter: planPlay, note: '总后台三个视角自动轮换：学生端视角吃苹果那张桌是红的；实验室视角变绿；实验楼视角只剩断电锁定那张红、加热无人那张标关注。' },
-    { orb: { x: 1752, y: 948, r: 16, c: 'g', glow: 1 }, note: '管理员对应实验楼，教师只管被授权的区域；阈值按区域下发，终端按硬上限再校验；语音包、复核、审计都在总后台。' },
-    { orb: { x: 1196, y: 296, r: 14, c: 'g', glow: 1 }, note: '三个独立程序：控制盒固件、实验台终端 run_app.py、总后台 run_center.py。安全判断在 SafetyEngine 里，所有界面只读快照。' },
+    { orb: { x: 1160, y: 240, r: 14, c: 'y', glow: 1 }, note: '实现上就是在同一份打分上做三次过滤：老师层去掉行为因子，实验楼层只看断电锁定和紧急事件。等级随快照字段 risk.tiers 上报，不参与断电。' },
+    { orb: { x: 1000, y: 214, r: 14, c: 'y', glow: 1 }, note: '安全助手的工具表只有 5 个只读工具，测试会扫描工具名，不允许出现电源、继电器类工具。线路自动选择，都不可用时用规则模板，截图里这条建议就是规则模板生成的。' },
+    { orb: { x: 1610, y: 300, r: 16, c: 'r', glow: 1.2 }, enter: cutPlay, note: '断电链路：开发板发 POWER_OFF，控制盒断继电器回 ACK，0.25 s 超时重发，最多发送 3 次，往返中位 4.9 ms。控制盒另有固件硬规则。软件和总后台都没有通电接口。' },
     { orb: { x: 1080, y: 220, r: 14, c: 'y', glow: 1 }, enter: hbPlay, note: '心跳不是定时器发的：只有安全判断每次跑完调用 feed()，发送线程才发心跳。程序卡死 5 s 心跳就停，控制盒 30 s 收不到心跳、继电器闭合且热源高于 60℃（测不到温度也算）就本地断电。' },
-    { orb: { x: 838, y: 262, r: 14, c: 'r', glow: 1 }, note: '帧格式：AA 55 帧头、长度、序号、命令、负载、CRC16-CCITT 小端。断电指令要 ACK，0.25 s 超时重发，最多发送 3 次。固件和仿真下位机共用这一协议。' },
-    { orb: { x: 1160, y: 240, r: 14, c: 'y', glow: 1 }, note: '分层上报只是在同一份打分上做三次过滤：老师层去掉行为因子，实验楼层只看断电锁定和紧急事件。等级随快照上报，不参与断电。' },
-    { orb: { x: 1160, y: 240, r: 14, c: 'g', glow: 1 }, note: '只断不通、大模型不碰电闸，这些约束都写成了测试：扫描路由和工具名。三套测试共 212 个用例，不需要硬件。' },
+    { orb: { x: 838, y: 262, r: 14, c: 'r', glow: 1 }, note: '帧格式：AA 55 帧头、长度、序号、命令、负载、CRC16-CCITT 小端。断电指令要 ACK，0.25 s 超时重发，最多发送 3 次。固件和仿真下位机共用这一协议，测试不需要硬件。' },
+    { orb: null, enter: planPlay, note: '总后台三个视角自动轮换：学生端视角吃苹果那张桌是红的；实验室视角变绿；实验楼视角只剩断电锁定那张红。视角就是接口参数 tier。' },
+    { orb: { x: 500, y: 222, r: 14, c: 'g', glow: 1 }, note: '终端每 2 秒调一次上报接口，带上快照和上次指令的执行结果；总后台返回区域阈值、待执行指令和语音包版本。指令白名单只有断电和静音。' },
+    { orb: { x: 1060, y: 660, r: 14, c: 'g', glow: 1 }, note: '账号、授权、阈值方案、语音包、审计都在总后台的 SQLite 里。阈值下发到终端后，终端按本机控制盒的硬上限重建白名单，超限项不生效并回报原因。' },
+    { orb: { x: 1160, y: 240, r: 14, c: 'g', glow: 1 }, note: '只断不通、大模型不碰电闸，这些约束都写成了测试：扫描路由和工具名。三套测试共 212 个用例，用仿真下位机，不需要硬件。' },
     { orb: { x: 172, y: 252, r: 14, c: 'g', glow: 1 }, note: '实物运行照片。' },
-    { orb: { x: 1180, y: 350, r: 20, c: 'g', glow: 1.2 }, enter: finalePlay, note: '总结：看清台面、按风险分级提醒、三层各自定级、危险时硬件断电、总后台管全楼。出发点是让做实验的同学在出事之前就被提醒。' }
+    { orb: { x: 1180, y: 350, r: 20, c: 'g', glow: 1.2 }, enter: finalePlay, note: '总结：需求落成三条工程约束，判断在本机、断电在硬件、提醒按三层分级、总后台管全楼。出发点是让做实验的同学在出事之前就被提醒。' }
   ];
 
   function applePlay() {
@@ -790,7 +969,7 @@ check(not any(k in p for p in routes
   }
   function levelsPlay() {
     var cases = document.querySelectorAll('#bLevels .case'), stops = [[456, 'g'], [1176, 'y'], [1680, 'r']], i = 0;
-    function go() { cases.forEach(function (c, k) { c.classList.toggle('on', k === i); }); O[0].to({ x: stops[i][0], y: 560, c: stops[i][1], r: 26 }, 900, { bend: .12 }); i = (i + 1) % 3; }
+    function go() { cases.forEach(function (c, k) { c.classList.toggle('on', k === i); }); O[0].to({ x: stops[i][0], y: 764, c: stops[i][1], r: 22 }, 900, { bend: .12 }); i = (i + 1) % 3; }
     later(500, function () { go(); every(2600, go); });
   }
   var TIER_ROWS = [['r', 'g', 'g'], ['y', 'y', 'g'], ['r', 'r', 'y'], ['r', 'r', 'r']], TIER_X = [880, 1233, 1586];
