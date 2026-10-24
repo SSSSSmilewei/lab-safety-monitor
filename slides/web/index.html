@@ -1,12 +1,14 @@
 <meta charset="utf-8">
 <title>实验室安全答辩演示</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap">
 <style>
 /* 布局：1920×1080 固定舞台等比缩放；浅色蓝图网格底，一颗信号灯圆点贯穿全场。
    玻璃只用在实物感的元素上（小屏外壳、平面图、结尾卡片）；代码统一用深色代码块；信号色只表示风险等级。 */
-@font-face { font-family: "Smiley Sans"; src: url("fonts/SmileySans-Oblique.woff2") format("woff2"); font-display: swap; }
+/* 字体：标题思源宋体，正文更纱黑体。本机装了就用本机的；没装时用 fonts/ 里的子集（思源宋体 = Noto Serif CJK SC；
+   更纱黑体的中文字形来自思源黑体，子集用 Noto Sans CJK SC 代替，西文字形略有差别）。 */
+@font-face { font-family: "LG Serif"; src: local("Source Han Serif SC SemiBold"), local("SourceHanSerifSC-SemiBold"), local("思源宋体 SemiBold"), local("Noto Serif CJK SC SemiBold"), local("NotoSerifCJKsc-SemiBold"), url("fonts/serif-sc-600.woff") format("woff"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "LG Sans"; src: local("Sarasa Gothic SC"), local("Sarasa-Gothic-SC-Regular"), local("更纱黑体 SC"), local("Sarasa UI SC"), url("fonts/sans-sc-400.woff") format("woff"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "LG Sans"; src: local("Sarasa Gothic SC SemiBold"), local("Sarasa-Gothic-SC-SemiBold"), local("更纱黑体 SC SemiBold"), url("fonts/sans-sc-500.woff") format("woff"); font-weight: 500 700; font-display: swap; }
 @font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Medium.woff2") format("woff2"); font-weight: 500; font-display: swap; }
 @font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
 :root {
@@ -26,9 +28,9 @@
   --glass: rgba(255, 255, 255, 0.6);
   --glass-edge: rgba(255, 255, 255, 0.95);
   --shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 28px 60px -24px rgba(38, 46, 110, 0.28), 0 2px 6px rgba(38, 46, 110, 0.06);
-  --f-hd: "Smiley Sans", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-  --f-body: "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-  --f-num: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --f-hd: "LG Serif", "Source Han Serif SC", "思源宋体", "Noto Serif CJK SC", "Songti SC", serif;
+  --f-body: "LG Sans", "Sarasa Gothic SC", "更纱黑体 SC", "Source Han Sans SC", "Noto Sans CJK SC", sans-serif;
+  --f-num: "Sarasa Mono SC", "等距更纱黑体 SC", "JetBrains Mono", "LG Sans", ui-monospace, monospace;
   --ease-out: cubic-bezier(.22, 1, .36, 1);
   --ease-io: cubic-bezier(.65, 0, .35, 1);
 }
@@ -49,7 +51,7 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
 .beat.on .in { opacity: 1; transform: none; }
 .abs { position: absolute; }
 
-.hd { font-family: var(--f-hd); font-weight: 400; letter-spacing: .5px; line-height: 1.1; margin: 0; text-wrap: balance; }
+.hd { font-family: var(--f-hd); font-weight: 600; letter-spacing: 0; line-height: 1.1; margin: 0; text-wrap: balance; }
 .h-xxl { font-size: 196px; } .h-xl { font-size: 100px; } .h-l { font-size: 72px; } .h-m { font-size: 54px; } .h-s { font-size: 38px; }
 .lead { font-size: 32px; line-height: 1.6; color: var(--ink-2); margin: 0; }
 .body { font-size: 27px; line-height: 1.6; color: var(--ink-2); margin: 0; }
@@ -158,7 +160,7 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
 .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--line); }
 .facts > div { padding: 30px 36px 0 0; display: flex; flex-direction: column; gap: 12px; }
 .facts > div + div { padding-left: 36px; border-left: 1px solid var(--line); }
-.facts b { font-family: var(--f-hd); font-weight: 400; font-size: 38px; color: var(--ink); line-height: 1.2; }
+.facts b { font-family: var(--f-hd); font-weight: 600; font-size: 38px; color: var(--ink); line-height: 1.2; }
 .axis { left: 240px; top: 556px; width: 1440px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgba(var(--g), .5) 0 30%, rgba(var(--y), .6) 30% 70%, rgba(var(--r), .55) 70% 100%); }
 .tick { position: absolute; top: 590px; font: 500 22px var(--f-num); color: var(--ink-3); transform: translateX(-50%); }
 .tick::before { content: ""; position: absolute; left: 50%; top: -30px; width: 2px; height: 18px; background: var(--ink-3); }
@@ -213,7 +215,7 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
 .tally { display: flex; gap: 12px; }
 .mgmt { left: 160px; top: 270px; width: 900px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 44px; }
 .mgmt > div { padding: 26px 0 30px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); }
-.mgmt h3 { margin: 0; font-family: var(--f-hd); font-weight: 400; font-size: 36px; }
+.mgmt h3 { margin: 0; font-family: var(--f-hd); font-weight: 600; font-size: 36px; }
 .shot { left: 1120px; top: 270px; width: 660px; padding: 14px; border-radius: 28px; }
 .shot img { display: block; width: 100%; border-radius: 16px; }
 .shot figcaption { font-size: 19px; color: var(--ink-3); padding: 12px 8px 2px; }
@@ -221,8 +223,8 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
 /* 工程实现 */
 .arch { left: 160px; top: 250px; width: 1600px; height: 680px; }
 .tier-box { position: absolute; top: 0; min-height: 560px; padding: 26px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; }
-.tier-box h3 { margin: 0; font-family: var(--f-hd); font-weight: 400; font-size: 34px; }
-.tier-box .meta { font: 500 18px var(--f-num); color: var(--ink-3); margin-top: -6px; }
+.tier-box h3 { margin: 0; font-family: var(--f-hd); font-weight: 600; font-size: 34px; }
+.tier-box .meta { font: 400 19px var(--f-body); color: var(--ink-3); margin-top: -6px; }
 .mod { padding: 12px 16px; border-radius: 12px; background: #F4F6FB; border: 1px solid var(--line); font-size: 21px; line-height: 1.45; color: var(--ink); }
 .mod small { display: block; font: 500 16px var(--f-num); color: var(--ink-3); }
 .mod.core { background: rgba(26, 31, 61, .92); color: #fff; border-color: transparent; }
@@ -245,8 +247,8 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
 .photo { border-radius: 22px; overflow: hidden; background: repeating-linear-gradient(45deg, rgba(26, 31, 61, .035) 0 14px, transparent 14px 28px), #fff; border: 2px dashed rgba(26, 31, 61, .22); box-sizing: border-box; }
 .photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .photo .ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 20px; }
-.photo .ph b { font-family: var(--f-hd); font-weight: 400; font-size: 34px; color: var(--ink-2); }
-.photo .ph span { font: 500 18px var(--f-num); color: var(--ink-3); }
+.photo .ph b { font-family: var(--f-hd); font-weight: 600; font-size: 34px; color: var(--ink-2); }
+.photo .ph span { font: 400 18px var(--f-body); color: var(--ink-3); }
 .photo.has { border: 0; } .photo.has .ph { display: none; }
 .photo figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 20px; font-size: 21px; color: #fff; background: linear-gradient(transparent, rgba(23, 27, 51, .7)); display: none; }
 .photo.has figcaption { display: block; }
@@ -255,6 +257,13 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
 .counts > div + div { padding-left: 28px; border-left: 1px solid var(--line); }
 .counts b { font: 700 52px var(--f-num); color: var(--ink); }
 
+.real { margin: 0; padding: 12px; border-radius: 26px; box-sizing: border-box; }
+.real img { display: block; width: 100%; border-radius: 14px; }
+.real figcaption { font-size: 19px; color: var(--ink-3); padding: 12px 6px 2px; }
+.chart .tip { pointer-events: none; }
+.chart .tip rect { fill: #fff; stroke: rgba(26, 31, 61, .16); }
+.chart .tip text { fill: var(--ink); font-size: 16px; }
+
 /* 结尾 */
 .finale-board { left: 680px; top: 310px; width: 560px; height: 340px; border-radius: 30px; transition: transform 1.2s var(--ease-io); transform-origin: 50% 50%; }
 .beat.retreat .finale-board { transform: scale(.62); }
@@ -262,7 +271,7 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
 .board .port { position: absolute; width: 70px; height: 34px; border-radius: 8px; background: rgba(26, 31, 61, .12); }
 .ring { position: absolute; width: 360px; padding: 22px 26px; display: flex; flex-direction: column; gap: 6px; opacity: 0; transform: scale(.8); transition: opacity .7s var(--ease-out), transform 1s cubic-bezier(.34, 1.45, .64, 1); transition-delay: calc(var(--k) * 80ms); box-sizing: border-box; }
 .beat.retreat .ring { opacity: 1; transform: none; }
-.ring b { font-family: var(--f-hd); font-weight: 400; font-size: 32px; color: var(--ink); }
+.ring b { font-family: var(--f-hd); font-weight: 600; font-size: 32px; color: var(--ink); }
 .ring span { font-size: 19px; color: var(--ink-2); line-height: 1.45; }
 .finale-title { left: 0; right: 0; top: 872px; text-align: center; opacity: 0; transition: opacity 1s var(--ease-out) .9s; }
 .beat.retreat .finale-title { opacity: 1; }
@@ -334,12 +343,12 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
           <div class="box" style="left:460px;top:32px;width:74px;height:188px"><span>Measuring Cylinder</span></div></div>
         <div class="chips"><span class="chip">烧杯</span><span class="chip">锥形瓶</span><span class="chip">圆底烧瓶</span><span class="chip">平底烧瓶</span><span class="chip">梨形瓶</span><span class="chip">试管</span><span class="chip">量筒</span><span class="chip">容量瓶</span><span class="chip">滴定管</span><span class="chip">移液管</span><span class="chip">试剂瓶</span><span class="chip">洗瓶</span><span class="chip">漏斗</span><span class="chip">滴定装置</span></div>
       </div>
-      <p class="abs small in" style="left:160px;top:940px;--i:3">检测框标签为模型原始类别名。两个模型共享一套推理线程，按配置的帧率轮流推理。</p>
+      <p class="abs small in" style="left:160px;top:940px;--i:3">检测框标签为模型原始类别名。两路画面成对读取，在同一个处理函数里依次送入两个模型。</p>
     </section>
 
     <section class="beat" data-ch="2" aria-label="模型指标">
       <h2 class="abs hd h-m in" style="left:160px;top:130px;--i:0">YOLO11n 微调，各约 2.59 M 参数</h2>
-      <p class="abs small in" style="left:160px;top:212px;--i:0">指标为训练结束时验证集上的目标检测指标，数据来自 models/model_card.json</p>
+      <p class="abs small in" style="left:160px;top:212px;--i:0">指标为 best.pt 所在轮次（人员模型第 77 轮，器皿模型第 50 轮）的验证集检测指标，数据来自 models/model_card.json</p>
       <div class="abs frame sheet in" id="mPpe" style="left:160px;top:270px;width:780px;height:660px;--i:1"></div>
       <div class="abs frame sheet in" id="mChem" style="left:980px;top:270px;width:780px;height:660px;--i:2"></div>
     </section>
@@ -389,6 +398,7 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
           <div><span class="klabel">防护</span><div class="ppe" id="kPpe"><span data-k="g">护目镜</span><span>实验服</span><span>手套</span><span data-k="m">口罩</span></div></div>
         </div>
         <div class="kfoot"><span>状态</span><span>画面</span><span>记录</span><span>静音 60s</span><span>呼叫教师</span><span>断电</span></div></div></div>
+      <p class="abs small in" style="left:166px;top:904px;--i:2">小屏界面示意，按当前小屏布局绘制</p>
       <div class="abs bubble" id="bub1" style="left:1080px;top:400px"><div class="who"><span class="lv y" style="height:34px;font-size:18px"><i></i>温和语气</span>语音提示</div><q>同学，记得戴好护目镜哦，眼睛只有一双。</q></div>
       <div class="abs bubble" id="bub2" style="left:1080px;top:640px"><div class="who"><span class="lv y" style="height:34px;font-size:18px"><i></i>温和语气</span>语音提示</div><q>实验区不能吃东西喝水哦，请到室外再吃。</q></div>
     </section>
@@ -396,8 +406,9 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
     <section class="beat" data-ch="3" aria-label="学生是第一用户">
       <div class="abs" style="left:160px;top:200px;width:1600px">
         <h2 class="hd h-xl in" style="--i:0">学生是第一用户</h2>
-        <p class="lead in" style="margin-top:30px;max-width:1300px;--i:1">系统的首要目标是减少火灾和人身伤害，而不是记录违规。所以提醒先发给台前的学生，管理端只接收需要处理的事件。</p>
+        <p class="lead in" style="margin-top:30px;max-width:860px;--i:1">系统的首要目标是减少火灾和人身伤害，而不是记录违规。所以提醒先发给台前的学生，管理端只接收需要处理的事件。</p>
       </div>
+      <figure class="abs real glass in" style="left:1100px;top:150px;width:660px;--i:2"><img src="img/kiosk-warning.png" alt="实验台小屏守护页：加热中无人值守，预测即将干烧"><figcaption>实机截图：实验台小屏，加热中无人值守、预测即将干烧</figcaption></figure>
       <div class="abs facts" style="left:330px;top:620px;width:1430px">
         <div class="in" style="--i:2"><b>每张实验桌一台终端</b><span class="body">RK3588 开发板、两路 USB 摄像头、控制盒与传感器、小屏；硬件采购估算 1000–1350 元</span></div>
         <div class="in" style="--i:3"><b>判断在本机完成</b><span class="body">识别、打分和断电不依赖网络；与总后台断开时终端照常工作，恢复后自动重连</span></div>
@@ -430,19 +441,10 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
     </section>
 
     <section class="beat" data-ch="3" aria-label="安全助手">
-      <div class="abs sheet in" style="left:160px;top:250px;width:900px;padding:34px 44px 18px;box-sizing:border-box;--i:1">
-        <div style="display:flex;align-items:center;gap:16px;padding-left:44px"><span class="hd h-s">处置建议</span><span class="small" style="margin-left:auto">警告与紧急事件自动生成</span></div>
-        <div class="kv" style="margin-top:14px">
-          <div class="k">风险等级</div><div class="v">高危</div>
-          <div class="k">当前工况</div><div class="v">加热中（沸腾 / 高温阶段）</div>
-          <div class="k">主要依据</div><div class="v">越过沸点仍在升温；干烧风险分 0.70</div>
-          <div class="k">处置步骤</div><div class="v">1. 立即降低火力或补充液体<br>2. 回到实验台查看液面</div>
-          <div class="k">手册条款</div><div class="v">《实验室安全手册》1.3 沸腾阶段的注意事项</div>
-        </div>
-      </div>
-      <div class="abs" style="left:1140px;top:250px;width:620px">
+      <figure class="abs real glass in" style="left:160px;top:230px;width:660px;--i:1"><img src="img/advice-card.png" alt="本机控制台事件卡片：预测即将干烧，附处理建议的原因、处置和手册依据"><figcaption>实机截图：本机控制台事件卡片，处理建议由规则模板生成</figcaption></figure>
+      <div class="abs" style="left:1000px;top:250px;width:760px">
         <h2 class="hd h-m in" style="--i:0">安全助手：只读，只建议</h2>
-        <p class="body in" style="margin-top:24px;--i:1">读取交叉验证结果和安全手册（BM25 检索），生成原因、步骤和条款引用。工具表只有 4 个只读工具，没有任何电源控制接口。</p>
+        <p class="body in" style="margin-top:24px;--i:1">读取交叉验证结果和安全手册（BM25 检索），生成原因、步骤和条款引用。工具表只有 5 个只读工具，没有电源控制接口。</p>
         <div class="routes in" style="margin-top:34px;--i:2"><div>远程通义千问<small>联网</small></div><div>本地 Ollama<small>局域网</small></div><div>规则模板<small>离线兜底</small></div></div>
       </div>
     </section>
@@ -456,11 +458,11 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
         <div class="link"><span>断开继电器</span><i class="pulse"></i></div>
         <div class="node">加热电源<small>已断开</small></div>
       </div>
-      <p class="abs small in" style="left:160px;top:440px;--i:2">控制盒回 ACK；0.25 s 未收到则重发，最多 3 次。真机实测 ACK 往返时延中位数 <span class="num ink">4.9 ms</span>。</p>
-      <div class="abs ctrlbox in" style="--i:2"><div class="leds"><i></i><i></i><i></i></div><div class="key">长按 2 秒</div><span class="abs small" style="left:50px;bottom:50px">控制盒</span></div>
+      <p class="abs small in" style="left:160px;top:440px;--i:2">控制盒回 ACK；0.25 s 未收到则重发，最多发送 3 次。真机实测 ACK 往返时延中位数 <span class="num ink">4.9 ms</span>。</p>
+      <figure class="abs real glass in" style="left:160px;top:530px;width:500px;--i:2"><img src="img/kiosk-locked.png" alt="实验台小屏断电锁定页：提示到现场长按控制盒复位键恢复供电"><figcaption>实机截图：小屏断电锁定页</figcaption></figure>
       <div class="abs rules3">
         <div class="in" style="--i:3"><span class="small">开发板规则（可按区域调整）</span><span class="body ink">R1 热源 ≥ 120℃<br>R3 加热中无人 60 s<br>R5 烟雾读数 ≥ 1800</span></div>
-        <div class="in" style="--i:4"><span class="small">控制盒本地硬规则（写在固件里）</span><span class="body ink">热源 ≥ 150℃<br>烟雾读数 ≥ 2500<br>心跳中断 30 s 且仍在加热</span></div>
+        <div class="in" style="--i:4"><span class="small">控制盒本地硬规则（写在固件里）</span><span class="body ink">热源 ≥ 150℃<br>烟雾读数 ≥ 2500<br>心跳中断 30 s，继电器闭合且热源 &gt; 60℃</span></div>
         <div class="wide in" style="--i:5"><span class="hd h-s" style="white-space:nowrap">恢复供电</span><span class="body">软件和总后台都没有通电接口。复电只能在现场长按控制键 2 秒，控制盒先复查温度和烟雾，超标则拒绝。</span></div>
       </div>
     </section>
@@ -491,10 +493,10 @@ body { margin: 0; overflow: hidden; background: var(--ground); color: var(--ink)
     <section class="beat" data-ch="5" aria-label="系统组成">
       <h2 class="abs hd h-m in" style="left:160px;top:120px;--i:0">系统组成：三个独立程序</h2>
       <div class="abs arch">
-        <div class="tier-box sheet in" style="left:0;width:390px;--i:1"><h3>控制盒</h3><span class="meta">ESP32-S3 · Arduino 固件</span>
+        <div class="tier-box sheet in" style="left:0;width:390px;--i:1"><h3>控制盒</h3><span class="meta">ESP32-S3，Arduino 固件</span>
           <div class="mod">SHT30 温湿度<br>MLX90614 红外测温<br>MQ-2 烟雾</div><div class="mod">继电器（加热电源）<br>控制键、信号灯、蜂鸣器</div><div class="mod core">本地硬规则<small>150℃ / 2500 / 心跳 30 s</small></div></div>
         <div class="wire in" style="left:400px;top:290px;width:150px;--i:2">USB 串口<i></i>AA 55 帧<br>CRC16</div>
-        <div class="tier-box sheet in" style="left:560px;width:660px;--i:2"><h3>实验台终端</h3><span class="meta">RK3588 · Python · run_app.py</span>
+        <div class="tier-box sheet in" style="left:560px;width:660px;--i:2"><h3>实验台终端</h3><span class="meta">RK3588，Python，run_app.py</span>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div class="mod">识别线程<small>dual_inference.py</small></div><div class="mod">传感器线程<small>sensor_worker.py</small></div>
             <div class="mod core" style="grid-column:1/-1">SafetyEngine：规则 R1–R9 → 交叉验证 → 温度预测<small>engine.py / state_machine.py / cross_check.py / world_model.py</small></div>
@@ -537,7 +539,7 @@ def engine_alive(self) -> bool:
 if self.engine_alive and (...):
     # 发出 HEARTBEAT</pre></div>
       <div class="abs code in" style="left:160px;top:722px;width:1600px;--i:3">
-        <div class="cap"><b>③ 控制盒：心跳中断 30 s 且仍在加热，本地断电</b>firmware/lab_guard_esp32/lab_guard_esp32.ino<span class="ln">L254–257</span></div>
+        <div class="cap"><b>③ 控制盒：心跳中断 30 s 且热源 &gt; 60℃，本地断电</b>firmware/lab_guard_esp32/lab_guard_esp32.ino<span class="ln">L254–257</span></div>
         <pre data-lang="c">if (mlxOk &amp;&amp; !isnan(objC) &amp;&amp; objC >= HARD_LIMIT_C) cutPower(CUT_OVERTEMP, EV_LOCAL_OVERTEMP);
 if (smokeReady() &amp;&amp; smokeRaw >= SMOKE_LIMIT_RAW)   cutPower(CUT_SMOKE, EV_LOCAL_SMOKE);
 bool hot = !mlxOk || isnan(objC) || objC > WATCHDOG_HOT_C;   // 测不到温度时按"可能很热"保守处理
@@ -574,7 +576,7 @@ def build_frame(seq: int, cmd: int, payload: bytes = b"") -> bytes:
           <div class="k">结果</div><div class="v">power_off_state 记录是否被确认</div>
           <div class="k">一致性</div><div class="v">固件与 tests/fake_mcu.py 用同一协议</div>
         </div>
-        <p class="small in" style="margin-top:16px;--i:5">接收端按帧头重新同步，半个包头会保留到下一次读取；CRC 错误计数可在控制台查看。</p>
+        <p class="small in" style="margin-top:16px;--i:5">接收端按帧头重新同步：长度非法或 CRC 错误的帧直接丢弃，不完整的帧留到下一次读取再拼接。</p>
       </div>
     </section>
 
@@ -668,8 +670,8 @@ check(not any(k in p for p in routes
   'use strict';
   var CURVES = {"ppe":{"a":[0.5862,0.6653,0.6929,0.7099,0.7284,0.7401,0.7523,0.7606,0.7773,0.7581,0.7848,0.7875,0.7903,0.7915,0.8017,0.8099,0.8093,0.8133,0.822,0.8213,0.8289,0.8278,0.8324,0.8325,0.8403,0.8378,0.8373,0.8413,0.8465,0.8459,0.8475,0.8505,0.8482,0.8521,0.8562,0.8587,0.8584,0.8612,0.8579,0.8632,0.8622,0.8626,0.8641,0.8672,0.8695,0.8713,0.8734,0.8722,0.8738,0.8722,0.8766,0.8762,0.8775,0.8785,0.8783,0.8787,0.8784,0.88,0.8818,0.8817,0.8801,0.883,0.883,0.8838,0.885,0.8838,0.8842,0.8851,0.8844,0.8872,0.8856,0.8869,0.8881,0.8859,0.8891,0.8894,0.8902,0.8899,0.8889,0.8882],"b":[0.3974,0.4458,0.4597,0.4758,0.492,0.5051,0.5126,0.5241,0.5367,0.5223,0.5443,0.5474,0.5515,0.5522,0.5606,0.5651,0.5662,0.5701,0.577,0.5736,0.5829,0.5809,0.5827,0.5835,0.5921,0.5908,0.5918,0.5957,0.5965,0.6006,0.5989,0.6007,0.5987,0.6017,0.6086,0.6063,0.6087,0.612,0.613,0.6149,0.6163,0.6176,0.6177,0.6203,0.6224,0.6226,0.6242,0.6245,0.6273,0.6246,0.6297,0.6281,0.6297,0.6312,0.6299,0.6308,0.6309,0.632,0.6347,0.6335,0.6327,0.6359,0.6357,0.6368,0.6383,0.6379,0.638,0.6393,0.6391,0.6408,0.6409,0.6406,0.6411,0.6404,0.6421,0.6417,0.6433,0.643,0.6426,0.6432]},"chem":{"a":[0.2327,0.3746,0.4441,0.5311,0.5825,0.6754,0.6229,0.6708,0.7043,0.7344,0.7182,0.7314,0.7707,0.7382,0.774,0.7631,0.799,0.787,0.7934,0.8144,0.7889,0.7896,0.7763,0.8092,0.8197,0.822,0.8074,0.8165,0.8291,0.8432,0.8473,0.831,0.8624,0.8773,0.8627,0.8458,0.8631,0.8802,0.8733,0.8885,0.8629,0.8798,0.8903,0.8693,0.8767,0.8815,0.8832,0.8874,0.8892,0.8927],"b":[0.1623,0.2636,0.2993,0.3789,0.4159,0.4868,0.4644,0.5074,0.5195,0.5507,0.5495,0.5503,0.5827,0.5715,0.5959,0.5972,0.6179,0.6149,0.6285,0.6344,0.6152,0.6214,0.598,0.6368,0.6418,0.6621,0.6421,0.6464,0.6532,0.6686,0.6795,0.669,0.7032,0.7202,0.7056,0.6877,0.6939,0.7166,0.7111,0.7276,0.6963,0.7236,0.7305,0.7188,0.7223,0.7224,0.7191,0.7307,0.7344,0.7373]}};
   var MODELS = [
-    { el: 'mPpe', key: 'ppe', name: '人员模型', cam: '全景摄像头', file: 'ppe_best.pt', ep: 80, cls: 12, m: [['mAP@0.5', 89.0], ['Precision', 83.4], ['Recall', 87.7], ['mAP@0.5:0.95', 64.3]] },
-    { el: 'mChem', key: 'chem', name: '器皿模型', cam: '台面摄像头', file: 'chem_best.pt', ep: 50, cls: 14, m: [['mAP@0.5', 89.3], ['Precision', 86.7], ['Recall', 85.1], ['mAP@0.5:0.95', 73.7]] }
+    { el: 'mPpe', key: 'ppe', name: '人员模型', cam: '全景摄像头', file: 'ppe_best.pt', ep: 80, best: 77, cls: 12, m: [['mAP@0.5', 89.0], ['Precision', 83.4], ['Recall', 87.7], ['mAP@0.5:0.95', 64.3]] },
+    { el: 'mChem', key: 'chem', name: '器皿模型', cam: '台面摄像头', file: 'chem_best.pt', ep: 50, best: 50, cls: 14, m: [['mAP@0.5', 89.3], ['Precision', 86.7], ['Recall', 85.1], ['mAP@0.5:0.95', 73.7]] }
   ];
   var stage = document.getElementById('stage'), halo = document.getElementById('halo');
   var beats = Array.prototype.slice.call(document.querySelectorAll('.beat'));
@@ -750,19 +752,19 @@ check(not any(k in p for p in routes
     { orb: { x: 362, y: 230, r: 40, c: 'n', glow: .2 }, note: '俯拍看不清台面细节：器皿种类、离桌边距离、温度都分辨不出；几十路画面也不可能有人实时盯守。' },
     { orb: { x: 250, y: 250, r: 46, c: 'g', glow: 1 }, note: '防患于未然：先识别风险并现场提醒；风险继续升级，由控制盒直接切断加热电源。' },
     { orb: { x: 1756, y: 274, r: 16, c: 'g', glow: 1 }, note: '全景摄像头跑人员模型（12 类：五类防护及其未佩戴类、进食、饮水），台面摄像头跑器皿模型（14 类）。' },
-    { orb: { x: 1760, y: 150, r: 14, c: 'g', glow: 1 }, note: '两个模型都是 YOLO11n 微调。人员模型 80 轮，mAP@0.5 为 89.0%；器皿模型 50 轮，mAP@0.5 为 89.3%，mAP@0.5:0.95 为 73.7%。这是验证集上的检测指标，不是事故识别准确率。' },
+    { orb: { x: 1760, y: 150, r: 14, c: 'g', glow: 1 }, note: '两个模型都是 YOLO11n 微调。人员模型训练 80 轮、取第 77 轮权重，mAP@0.5 为 89.0%；器皿模型 50 轮，mAP@0.5 为 89.3%，mAP@0.5:0.95 为 73.7%。这是验证集上的检测指标，不是事故识别准确率。' },
     { orb: { x: 1060, y: 260, r: 14, c: 'g', glow: 1 }, note: '检测结果先过时间窗口投票：3 s 窗口内命中帧占比 ≥60% 才确认，≤20% 才解除，单帧误检不会触发提醒。NPU 单帧推理人员 120 ms、器皿 116 ms。' },
     { orb: { x: 213, y: 424, r: 17, c: 'g', glow: 1 }, enter: applePlay, note: '演示：摘下护目镜时温和提示；咬一口苹果再提示，小屏逐条列出要做的事；分数叠加后信号灯变红。' },
     { orb: { x: 230, y: 860, r: 46, c: 'g', glow: 1.1 }, note: '学生是第一用户：目标是减少火灾和伤害。每张实验桌一台终端，判断在本机完成，断网也照常工作。' },
     { orb: { x: 456, y: 560, r: 26, c: 'g', glow: 1 }, enter: levelsPlay, note: '第一个分叉：交叉验证是多源规则打分，不是机器学习里的交叉验证。30 分以下低危，70 分以上高危，低中危温和语气，高危严厉语气。' },
     { orb: { x: 880, y: 268, r: 24, c: 'r', glow: 1 }, enter: tiersPlay, note: '第二个分叉：同一事件三层各自定级。吃苹果对学生是高危，对老师只记知会，对实验楼不打扰；断电锁定三层都是最高。' },
-    { orb: { x: 226, y: 300, r: 14, c: 'r', glow: .9 }, note: '安全助手读取打分结果和安全手册，写原因、步骤和条款；三条线路：通义千问、本地 Ollama、离线规则模板。工具表只有 4 个只读工具。' },
-    { orb: { x: 225, y: 625, r: 16, c: 'r', glow: 1.2 }, enter: cutPlay, note: '断电链路：开发板发 POWER_OFF，控制盒断继电器回 ACK，0.25 s 超时重发最多 3 次，往返中位 4.9 ms。控制盒另有 150℃、烟雾 2500、心跳 30 s 的本地硬规则。只断不通。' },
+    { orb: { x: 1000, y: 214, r: 14, c: 'y', glow: 1 }, note: '安全助手读取打分结果和安全手册，写原因、步骤和条款；三条线路：通义千问、本地 Ollama、离线规则模板。工具表只有 5 个只读工具。' },
+    { orb: { x: 1610, y: 300, r: 16, c: 'r', glow: 1.2 }, enter: cutPlay, note: '断电链路：开发板发 POWER_OFF，控制盒断继电器回 ACK，0.25 s 超时重发，最多发送 3 次，往返中位 4.9 ms。控制盒另有 150℃、烟雾 2500、心跳 30 s 的本地硬规则。只断不通。' },
     { orb: null, enter: planPlay, note: '总后台三个视角自动轮换：学生端视角吃苹果那张桌是红的；实验室视角变绿；实验楼视角只剩断电锁定那张红、加热无人那张标关注。' },
     { orb: { x: 1752, y: 948, r: 16, c: 'g', glow: 1 }, note: '管理员对应实验楼，教师只管被授权的区域；阈值按区域下发，终端按硬上限再校验；语音包、复核、审计都在总后台。' },
     { orb: { x: 1196, y: 296, r: 14, c: 'g', glow: 1 }, note: '三个独立程序：控制盒固件、实验台终端 run_app.py、总后台 run_center.py。安全判断在 SafetyEngine 里，所有界面只读快照。' },
-    { orb: { x: 1080, y: 220, r: 14, c: 'y', glow: 1 }, enter: hbPlay, note: '心跳不是定时器发的：只有安全判断每次跑完调用 feed()，发送线程才发心跳。程序卡死 5 s 心跳就停，控制盒 30 s 收不到心跳且仍在加热就本地断电。' },
-    { orb: { x: 838, y: 262, r: 14, c: 'r', glow: 1 }, note: '帧格式：AA 55 帧头、长度、序号、命令、负载、CRC16-CCITT 小端。断电指令要 ACK，0.25 s 超时重发，最多 3 次。固件和仿真下位机共用这一协议。' },
+    { orb: { x: 1080, y: 220, r: 14, c: 'y', glow: 1 }, enter: hbPlay, note: '心跳不是定时器发的：只有安全判断每次跑完调用 feed()，发送线程才发心跳。程序卡死 5 s 心跳就停，控制盒 30 s 收不到心跳、继电器闭合且热源高于 60℃（测不到温度也算）就本地断电。' },
+    { orb: { x: 838, y: 262, r: 14, c: 'r', glow: 1 }, note: '帧格式：AA 55 帧头、长度、序号、命令、负载、CRC16-CCITT 小端。断电指令要 ACK，0.25 s 超时重发，最多发送 3 次。固件和仿真下位机共用这一协议。' },
     { orb: { x: 1160, y: 240, r: 14, c: 'y', glow: 1 }, note: '分层上报只是在同一份打分上做三次过滤：老师层去掉行为因子，实验楼层只看断电锁定和紧急事件。等级随快照上报，不参与断电。' },
     { orb: { x: 1160, y: 240, r: 14, c: 'g', glow: 1 }, note: '只断不通、大模型不碰电闸，这些约束都写成了测试：扫描路由和工具名。三套测试共 212 个用例，不需要硬件。' },
     { orb: { x: 172, y: 252, r: 14, c: 'g', glow: 1 }, note: '实物运行照片。' },
@@ -853,24 +855,51 @@ check(not any(k in p for p in routes
     later(1500, function () { b.classList.add('retreat'); O[0].to({ x: 960 + (1180 - 960) * .62, y: 480 + (350 - 480) * .62, r: 14 }, 1200, { bend: 0 }); });
   }
 
-  function chart(key, ep) {
-    var W = 700, H = 300, L = 48, R = 70, T = 14, Bm = 36, c = CURVES[key];
-    var x = function (i) { return L + (W - L - R) * i / (c.a.length - 1); }, y = function (v) { return T + (H - T - Bm) * (1 - v); };
+  // 训练曲线：两条线（mAP@0.5 蓝、mAP@0.5:0.95 橙，配色经 dataviz 校验），标出 best.pt 所在轮次；悬停显示每轮数值
+  var CA = '#2a78d6', CB = '#eb6834';
+  function chart(m) {
+    var W = 700, H = 300, L = 48, R = 24, T = 14, Bm = 36, c = CURVES[m.key], n = c.a.length;
+    var x = function (i) { return L + (W - L - R) * i / (n - 1); }, y = function (v) { return T + (H - T - Bm) * (1 - v); };
     var pts = function (arr) { return arr.map(function (v, i) { return x(i).toFixed(1) + ',' + y(v).toFixed(1); }).join(' '); };
-    var g = '';
+    var g = '', bi = m.best - 1;
     [0, .25, .5, .75, 1].forEach(function (v) { g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="rgba(26,31,61,.08)"/><text x="' + (L - 10) + '" y="' + (y(v) + 6) + '" text-anchor="end">' + v.toFixed(2) + '</text>'; });
-    var la = c.a[c.a.length - 1], lb = c.b[c.b.length - 1];
-    return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="训练曲线：验证集 mAP@0.5 与 mAP@0.5:0.95 随轮数变化">' + g +
-      '<polyline points="' + pts(c.b) + '" fill="none" stroke="#9AA4D6" stroke-width="3" stroke-linejoin="round"/><polyline points="' + pts(c.a) + '" fill="none" stroke="#1A1F3D" stroke-width="3.5" stroke-linejoin="round"/>' +
-      '<circle cx="' + x(c.a.length - 1) + '" cy="' + y(la) + '" r="6" fill="#1A1F3D"/><circle cx="' + x(c.b.length - 1) + '" cy="' + y(lb) + '" r="6" fill="#9AA4D6"/>' +
-      '<text x="' + (x(c.a.length - 1) + 12) + '" y="' + (y(la) + 6) + '" style="fill:#1A1F3D">' + la.toFixed(3) + '</text><text x="' + (x(c.b.length - 1) + 12) + '" y="' + (y(lb) + 6) + '">' + lb.toFixed(3) + '</text>' +
-      '<text x="' + L + '" y="' + (H - 6) + '">epoch 1</text><text x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end">' + ep + '</text></svg>';
+    var bx = x(bi), lx = bi > n * .7 ? bx - 10 : bx + 10, anc = bi > n * .7 ? 'end' : 'start';
+    return '<svg class="chart" data-key="' + m.key + '" data-best="' + m.best + '" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + m.name + '训练曲线：验证集 mAP@0.5 与 mAP@0.5:0.95 随轮数变化，best.pt 为第 ' + m.best + ' 轮">' + g +
+      '<line x1="' + bx + '" x2="' + bx + '" y1="' + T + '" y2="' + (H - Bm) + '" stroke="rgba(26,31,61,.28)" stroke-dasharray="4 5"/>' +
+      '<text x="' + lx + '" y="' + (T + 16) + '" text-anchor="' + anc + '" style="fill:#4E5577">best.pt，第 ' + m.best + ' 轮</text>' +
+      '<polyline points="' + pts(c.b) + '" fill="none" stroke="' + CB + '" stroke-width="2.5" stroke-linejoin="round"/><polyline points="' + pts(c.a) + '" fill="none" stroke="' + CA + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<circle cx="' + bx + '" cy="' + y(c.a[bi]) + '" r="6" fill="' + CA + '" stroke="#fff" stroke-width="2"/><circle cx="' + bx + '" cy="' + y(c.b[bi]) + '" r="6" fill="' + CB + '" stroke="#fff" stroke-width="2"/>' +
+      '<text x="' + L + '" y="' + (H - 6) + '">第 1 轮</text><text x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end">第 ' + n + ' 轮</text>' +
+      '<g class="tip" visibility="hidden"><line class="tx" y1="' + T + '" y2="' + (H - Bm) + '" stroke="rgba(26,31,61,.4)"/><circle class="ta" r="5" fill="' + CA + '" stroke="#fff" stroke-width="2"/><circle class="tb" r="5" fill="' + CB + '" stroke="#fff" stroke-width="2"/>' +
+      '<rect class="tr" width="196" height="76" rx="8"/><text class="t0" font-weight="600"></text><text class="t1"></text><text class="t2"></text></g>' +
+      '<rect class="hitarea" x="' + L + '" y="' + T + '" width="' + (W - L - R) + '" height="' + (H - T - Bm) + '" fill="transparent"/></svg>';
   }
+  function bindTip(svg) {
+    var c = CURVES[svg.dataset.key], n = c.a.length, W = 700, H = 300, L = 48, R = 24, T = 14, Bm = 36, tip = svg.querySelector('.tip');
+    var x = function (i) { return L + (W - L - R) * i / (n - 1); }, y = function (v) { return T + (H - T - Bm) * (1 - v); };
+    function q(s) { return tip.querySelector(s); }
+    function move(e) {
+      var p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; p = p.matrixTransform(svg.getScreenCTM().inverse());
+      var i = Math.max(0, Math.min(n - 1, Math.round((p.x - L) / (W - L - R) * (n - 1)))), px = x(i);
+      q('.tx').setAttribute('x1', px); q('.tx').setAttribute('x2', px);
+      q('.ta').setAttribute('cx', px); q('.ta').setAttribute('cy', y(c.a[i])); q('.tb').setAttribute('cx', px); q('.tb').setAttribute('cy', y(c.b[i]));
+      var bx = px + 14 + 196 > W ? px - 14 - 196 : px + 14;
+      q('.tr').setAttribute('x', bx); q('.tr').setAttribute('y', T + 40);
+      [['.t0', '第 ' + (i + 1) + ' 轮' + (i + 1 === +svg.dataset.best ? '（best.pt）' : '')], ['.t1', 'mAP@0.5　' + (c.a[i] * 100).toFixed(1) + '%'], ['.t2', 'mAP@0.5:0.95　' + (c.b[i] * 100).toFixed(1) + '%']].forEach(function (t, k) {
+        var el = q(t[0]); el.textContent = t[1]; el.setAttribute('x', bx + 12); el.setAttribute('y', T + 62 + k * 21); });
+      tip.setAttribute('visibility', 'visible');
+    }
+    var hit = svg.querySelector('.hitarea');
+    hit.addEventListener('pointermove', move); hit.addEventListener('pointerleave', function () { tip.setAttribute('visibility', 'hidden'); });
+  }
+  function key(color) { return '<b style="display:inline-block;width:22px;height:3px;border-radius:2px;background:' + color + ';vertical-align:middle;margin-right:8px"></b>'; }
   MODELS.forEach(function (m) {
-    document.getElementById(m.el).innerHTML =
-      '<div class="top"><span class="hd h-s">' + m.name + '</span><span class="small">' + m.cam + '，' + m.cls + ' 类，' + m.ep + ' epoch</span></div>' +
-      '<div class="metric4">' + m.m.map(function (x) { return '<div><b>' + x[1].toFixed(1) + '%</b><small>' + x[0] + '</small></div>'; }).join('') + '</div>' + chart(m.key, m.ep) +
-      '<div class="small" style="display:flex;gap:24px"><span><b style="display:inline-block;width:22px;height:4px;background:#1A1F3D;vertical-align:middle;margin-right:8px"></b>mAP@0.5</span><span><b style="display:inline-block;width:22px;height:4px;background:#9AA4D6;vertical-align:middle;margin-right:8px"></b>mAP@0.5:0.95</span><span style="margin-left:auto" class="num">' + m.file + '</span></div>';
+    var el = document.getElementById(m.el);
+    el.innerHTML =
+      '<div class="top"><span class="hd h-s">' + m.name + '</span><span class="small">' + m.cam + '，' + m.cls + ' 类，训练 ' + m.ep + ' 轮</span></div>' +
+      '<div class="metric4">' + m.m.map(function (x) { return '<div><b>' + x[1].toFixed(1) + '%</b><small>' + x[0] + '</small></div>'; }).join('') + '</div>' + chart(m) +
+      '<div class="small" style="display:flex;gap:24px"><span>' + key(CA) + 'mAP@0.5</span><span>' + key(CB) + 'mAP@0.5:0.95</span><span style="margin-left:auto" class="num">' + m.file + '</span></div>';
+    bindTip(el.querySelector('svg'));
   });
 
   var nav = document.getElementById('nav'), notes = document.getElementById('notes');

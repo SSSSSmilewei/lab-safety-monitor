@@ -5,20 +5,21 @@ const pptxgen = require("pptxgenjs");
 const { applyTheme } = require(process.env.PPTX_SKILL_DIR ? path.join(process.env.PPTX_SKILL_DIR, "scripts/apply_theme.js") : "/mnt/skills/public/pptx/scripts/apply_theme.js");
 
 const OUT = path.join(__dirname, "..", "实验室安全答辩.pptx");
-const IMG = path.join(__dirname, "..", "web", "img", "center-floorplan.png");
+const WEBIMG = (f) => path.join(__dirname, "..", "web", "img", f);
+const IMG = WEBIMG("center-floorplan.png");
 const THEME = {
   name: "LabGuard",
-  headFontFace: "Microsoft YaHei",
-  bodyFontFace: "Microsoft YaHei",
+  headFontFace: "思源宋体",
+  bodyFontFace: "更纱黑体 SC",
   colors: { dk1: "1A1F3D", lt1: "FFFFFF", dk2: "4E5577", lt2: "F1F3F8", accent1: "16A362", accent2: "EC9808", accent3: "E03A32", accent4: "5C6BC0", accent5: "171B33", accent6: "7F86A3", hlink: "5C6BC0", folHlink: "4E5577" },
 };
 const HEX = { ink: "1A1F3D", g: "16A362", y: "EC9808", r: "E03A32", n: "969DB8", code: "171B33" };
-const MONO = "Consolas";
+const MONO = "Consolas"; // 代码与数字；中文注释会落到正文字体
+const HEAD = THEME.headFontFace;
 
 const pres = new pptxgen();
 pres.layout = "LAYOUT_WIDE"; // 13.333 × 7.5 in；1 in = 144 px（与网页 1920×1080 舞台同比例）
 pres.title = "基于双摄协同的实验室安全事前干预监测系统";
-pres.author = "湖南涉外经济学院 3 队";
 pres.theme = { headFontFace: THEME.headFontFace, bodyFontFace: THEME.bodyFontFace };
 const C = pres.SchemeColor;
 const INK = C.text1, INK2 = C.text2, BG = C.background2, WHITE = C.background1;
@@ -29,17 +30,17 @@ const px = (v) => v / 144;
 const footer = { text: { text: "基于双摄协同的实验室安全事前干预监测系统", options: { x: 0.83, y: 7.05, w: 7, h: 0.3, fontSize: 10, color: MUTE, margin: 0 } } };
 pres.defineSlideMaster({
   title: "TITLE", background: { color: BG },
-  objects: [{ placeholder: { options: { name: "title", type: "title", x: 1, y: 3.4, w: 11.33, h: 1.8, fontSize: 48, bold: true, color: INK, align: "center", valign: "middle" }, text: "" } },
+  objects: [{ placeholder: { options: { name: "title", type: "title", fontFace: HEAD, x: 1, y: 3.4, w: 11.33, h: 1.8, fontSize: 48, bold: true, color: INK, align: "center", valign: "middle" }, text: "" } },
             { placeholder: { options: { name: "body", type: "body", x: 1, y: 5.35, w: 11.33, h: 0.6, fontSize: 18, color: MUTE, align: "center" }, text: "" } }],
 });
 pres.defineSlideMaster({
   title: "CONTENT", background: { color: BG },
-  objects: [{ placeholder: { options: { name: "title", type: "title", x: 0.83, y: 0.55, w: 11.6, h: 0.8, fontSize: 32, bold: true, color: INK, valign: "middle", align: "left", margin: 0 }, text: "" } }, footer],
+  objects: [{ placeholder: { options: { name: "title", type: "title", fontFace: HEAD, x: 0.83, y: 0.55, w: 11.6, h: 0.8, fontSize: 32, bold: true, color: INK, valign: "middle", align: "left", margin: 0 }, text: "" } }, footer],
   slideNumber: { x: 12.2, y: 7.05, w: 0.5, h: 0.3, fontSize: 10, color: MUTE, align: "right" },
 });
 pres.defineSlideMaster({
   title: "PHOTO3", background: { color: BG },
-  objects: [{ placeholder: { options: { name: "title", type: "title", x: 0.83, y: 0.55, w: 11.6, h: 0.8, fontSize: 32, bold: true, color: INK, valign: "middle", margin: 0 }, text: "" } },
+  objects: [{ placeholder: { options: { name: "title", type: "title", fontFace: HEAD, x: 0.83, y: 0.55, w: 11.6, h: 0.8, fontSize: 32, bold: true, color: INK, valign: "middle", margin: 0 }, text: "" } },
             { placeholder: { options: { name: "photo1", type: "pic", x: 0.83, y: 1.67, w: 5.83, h: 4.9 }, text: "照片 1：实验台终端整机运行" } },
             { placeholder: { options: { name: "photo2", type: "pic", x: 7.0, y: 1.67, w: 5.5, h: 2.35 }, text: "照片 2：控制盒与传感器接线" } },
             { placeholder: { options: { name: "photo3", type: "pic", x: 7.0, y: 4.22, w: 5.5, h: 2.35 }, text: "照片 3：小屏提醒或总后台联调" } }, footer],
@@ -61,7 +62,15 @@ function orb(s, cx, cy, d, c, name) {
   s.addShape(pres.shapes.OVAL, { x: px(cx) - d / 2, y: px(cy) - d / 2, w: d, h: d, fill: { color: c === "n" ? MUTE : { g: G, y: Y, r: R }[c] }, line: { color: WHITE, width: 1.5 },
     shadow: { type: "outer", color: HEX[c], blur: 14, offset: 0, angle: 90, opacity: 0.55 }, objectName: name || "信号灯" });
 }
-const T = (s, text, o) => s.addText(text, Object.assign({ isTextBox: true, margin: 0, color: INK2, fontSize: 16, valign: "top", paraSpaceAfter: 4 }, o));
+const T = (s, text, o) => s.addText(text, Object.assign({ isTextBox: true, margin: 0, color: INK2, fontSize: 16, valign: "top", paraSpaceAfter: 4 }, o.bold && o.fontSize >= 17 && !o.fontFace ? { fontFace: HEAD } : {}, o));
+// 实机截图 + 图注
+function shot(s, file, x, y, w, ratio, cap, alt) {
+  const h = w * ratio;
+  s.addImage({ path: WEBIMG(file), x, y, w, h, altText: alt || cap });
+  s.addShape(pres.shapes.RECTANGLE, { x, y, w, h, fill: { type: "none" }, line: { color: "DDE0EA", width: 0.75 } });
+  T(s, cap, { x, y: y + h + 0.08, w, h: 0.3, fontSize: 11, color: MUTE });
+  return h;
+}
 function card(s, x, y, w, h, o) {
   s.addShape(pres.shapes.ROUNDED_RECTANGLE, Object.assign({ x, y, w, h, rectRadius: 0.16, fill: { color: WHITE }, line: { color: "DDE0EA", width: 0.75 } }, o));
 }
@@ -114,14 +123,14 @@ function camera(s) {
 }
 s = slide("CONTENT", "需求", null, "现有监控只记录已发生的事：事故发生时不能干预，事故发生前不能预警。");
 camera(s);
-s.addText("监控只能事后回看", { isTextBox: true, x: px(760), y: px(230), w: 7, h: 0.9, fontSize: 40, bold: true, color: INK, margin: 0 });
+s.addText("监控只能事后回看", { isTextBox: true, x: px(760), y: px(230), w: 7, h: 0.9, fontSize: 40, bold: true, fontFace: HEAD, color: INK, margin: 0 });
 T(s, "天花板监控记录的是已经发生的事。事故发生时它不能干预，事故发生前它也不能预警。", { x: px(760), y: px(360), w: 6.8, h: 1, fontSize: 20 });
 steps(s, px(760), px(520), ["事故发生", "录像存档", "事后调取"]);
 
 s = slide("CONTENT", "需求", null, "俯拍看不清台面细节：器皿种类、离桌边距离、温度都分辨不出；几十路画面也不可能有人实时盯守。");
 camera(s);
 s.addShape(pres.shapes.RIGHT_TRIANGLE, { x: px(362), y: px(262), w: px(398), h: px(638), fill: { color: IND, transparency: 92 }, line: { type: "none" }, flipH: false });
-s.addText("看得到人，\n看不清台面", { isTextBox: true, x: 0.83, y: px(380), w: 3.9, h: 1.3, fontSize: 30, bold: true, color: INK, margin: 0 });
+s.addText("看得到人，\n看不清台面", { isTextBox: true, x: 0.83, y: px(380), w: 3.9, h: 1.3, fontSize: 30, bold: true, fontFace: HEAD, color: INK, margin: 0 });
 T(s, "俯拍画面里分辨不出器皿种类、离桌边的距离和温度。一间实验室几十路画面，也不可能有人实时盯守。", { x: 0.83, y: px(560), w: 3.75, h: 1.6, fontSize: 16 });
 card(s, px(760), px(320), px(1020), px(580), { fill: { color: "E8EBF4" } });
 [[80, 120], [400, 120], [720, 120], [80, 360], [400, 360], [720, 360]].forEach((d) => s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: px(760 + d[0]), y: px(320 + d[1]), w: px(210), h: px(90), rectRadius: 0.08, fill: { color: IND, transparency: 80 }, line: { type: "none" } }));
@@ -130,7 +139,7 @@ T(s, "烧杯还是量筒？\n离桌边多远？\n热源多少度？", { x: px(12
 
 s = slide("CONTENT", "需求", null, "防患于未然：先识别风险并现场提醒；风险继续升级，由控制盒直接切断加热电源。");
 orb(s, 250, 250, 0.62, "g");
-s.addText("防患于未然", { isTextBox: true, x: px(200), y: px(330), w: 10, h: 1.9, fontSize: 96, bold: true, color: INK, margin: 0 });
+s.addText("防患于未然", { isTextBox: true, x: px(200), y: px(330), w: 10, h: 1.9, fontSize: 96, bold: true, fontFace: HEAD, color: INK, margin: 0 });
 T(s, "在事故发生之前识别风险：先在现场提醒操作者；风险继续升级，由控制盒直接切断加热电源。", { x: px(200), y: px(640), w: 10.5, h: 0.9, fontSize: 20 });
 steps(s, px(200), px(820), ["1  识别风险", "2  现场提醒", "3  硬件断电"]);
 
@@ -157,29 +166,30 @@ s = slide("CONTENT", "识别", "两路摄像头分工：全景看人，台面看
   }
   T(s, col[3].join("　"), { x: x + 0.24, y: px(270) + 2.85, w: px(780) - 0.48, h: 1.3, fontSize: 15, color: INK, lineSpacingMultiple: 1.5 });
 });
-T(s, "检测框标签为模型原始类别名。两个模型共享一套推理线程，按配置的帧率轮流推理。", { x: 0.83, y: px(935), w: 11, h: 0.35, fontSize: 12, color: MUTE });
+T(s, "检测框标签为模型原始类别名。两路画面成对读取，在同一个处理函数里依次送入两个模型。", { x: 0.83, y: px(935), w: 11, h: 0.35, fontSize: 12, color: MUTE });
 orb(s, 1756, 274, 0.22, "g");
 
-s = slide("CONTENT", "识别", "YOLO11n 微调，各约 2.59 M 参数", "人员模型 80 轮，mAP@0.5 为 89.0%；器皿模型 50 轮，mAP@0.5 为 89.3%，mAP@0.5:0.95 为 73.7%。这是验证集上的检测指标，不是事故识别准确率。");
+s = slide("CONTENT", "识别", "YOLO11n 微调，各约 2.59 M 参数", "人员模型训练 80 轮、取第 77 轮权重，mAP@0.5 为 89.0%；器皿模型 50 轮，mAP@0.5 为 89.3%，mAP@0.5:0.95 为 73.7%。这是验证集上的检测指标，不是事故识别准确率。");
 const CUR = require("./curves.json");
-[[160, "人员模型", "全景摄像头，12 类，80 epoch", "ppe", [["mAP@0.5", "89.0%"], ["Precision", "83.4%"], ["Recall", "87.7%"], ["mAP@0.5:0.95", "64.3%"]]],
- [980, "器皿模型", "台面摄像头，14 类，50 epoch", "chem", [["mAP@0.5", "89.3%"], ["Precision", "86.7%"], ["Recall", "85.1%"], ["mAP@0.5:0.95", "73.7%"]]]].forEach((m) => {
+[[160, "人员模型", "全景摄像头，12 类，训练 80 轮", "ppe", 77, [["mAP@0.5", "89.0%"], ["Precision", "83.4%"], ["Recall", "87.7%"], ["mAP@0.5:0.95", "64.3%"]]],
+ [980, "器皿模型", "台面摄像头，14 类，训练 50 轮", "chem", 50, [["mAP@0.5", "89.3%"], ["Precision", "86.7%"], ["Recall", "85.1%"], ["mAP@0.5:0.95", "73.7%"]]]].forEach((m) => {
   const x = px(m[0]); card(s, x, px(270), px(780), px(660));
   T(s, m[1], { x: x + 0.24, y: px(270) + 0.22, w: 2, h: 0.45, fontSize: 22, bold: true, color: INK });
   T(s, m[2], { x: x + 2.2, y: px(270) + 0.27, w: 2.95, h: 0.4, fontSize: 13, color: MUTE, align: "right" });
-  m[4].forEach((v, i) => {
+  m[5].forEach((v, i) => {
     T(s, v[1], { x: x + 0.24 + i * 1.24, y: px(270) + 0.8, w: 1.2, h: 0.5, fontSize: 24, bold: true, color: INK, fontFace: MONO });
     T(s, v[0], { x: x + 0.24 + i * 1.24, y: px(270) + 1.3, w: 1.2, h: 0.3, fontSize: 11, color: MUTE });
   });
   const c = CUR[m[3]], labels = c.a.map((_, i) => String(i + 1));
   s.addChart(pres.charts.LINE, [{ name: "mAP@0.5", labels, values: c.a }, { name: "mAP@0.5:0.95", labels, values: c.b }], {
-    x: x + 0.15, y: px(270) + 1.7, w: px(780) - 0.3, h: 2.7, chartColors: [HEX.ink, "9AA4D6"], lineSize: 2, lineDataSymbol: "none",
+    x: x + 0.15, y: px(270) + 1.7, w: px(780) - 0.3, h: 2.5, chartColors: ["2A78D6", "EB6834"], lineSize: 2, lineDataSymbol: "none",
     valAxisMinVal: 0, valAxisMaxVal: 1, valAxisMajorUnit: 0.25, valAxisLabelFormatCode: "0.00", catAxisLabelFrequency: 10,
     valAxisLabelColor: "7F86A3", catAxisLabelColor: "7F86A3", valAxisLabelFontSize: 10, catAxisLabelFontSize: 10, valAxisLabelFontFace: "+mn-lt", catAxisLabelFontFace: "+mn-lt",
     valGridLine: { color: "E3E6EF", size: 0.75 }, catGridLine: { style: "none" }, catAxisLabelRotate: 0, showLegend: true, legendPos: "b", legendFontSize: 11, legendColor: "4E5577", legendFontFace: "+mn-lt",
-    showTitle: true, title: "验证集指标随 epoch 变化", titleFontSize: 12, titleColor: "4E5577", titleFontFace: "+mn-lt" });
+    showTitle: true, title: "验证集指标随轮次变化（横轴：轮次）", titleFontSize: 12, titleColor: "4E5577", titleFontFace: "+mn-lt" });
+  T(s, "best.pt：第 " + m[4] + " 轮　mAP@0.5 " + (c.a[m[4] - 1] * 100).toFixed(1) + "%", { x: x + 0.24, y: px(270) + 4.25, w: 4, h: 0.3, fontSize: 12, color: INK2 });
 });
-T(s, "指标为训练结束时验证集上的目标检测指标，数据来自 models/model_card.json", { x: 0.83, y: px(212), w: 10, h: 0.3, fontSize: 12, color: MUTE });
+T(s, "指标为 best.pt 所在轮次（人员模型第 77 轮，器皿模型第 50 轮）的验证集检测指标，数据来自 models/model_card.json", { x: 0.83, y: px(212), w: 10, h: 0.3, fontSize: 12, color: MUTE });
 orb(s, 1760, 150, 0.2, "g");
 
 s = slide("CONTENT", "识别", "从检测框到事件：时间窗口投票", "检测结果先过时间窗口投票：3 s 窗口内命中帧占比 ≥60% 才确认，≤20% 才解除，单帧误检不会触发提醒。NPU 单帧推理人员 120 ms、器皿 116 ms。");
@@ -227,6 +237,7 @@ T(s, "防护", { x: kx + 4.3, y: ky + px(90), w: 1.5, h: 0.3, fontSize: 12 });
 });
 ["状态", "画面", "记录", "静音 60s", "呼叫教师", "断电"].forEach((t, i) => T(s, t, { x: kx + i * kw / 6, y: ky + kh - px(72), w: kw / 6, h: px(72), fontSize: 12, color: i === 5 ? "A3221B" : INK, align: "center", valign: "middle" }));
 orb(s, 213, 424, 0.24, "r");
+T(s, "小屏界面示意，按当前小屏布局绘制", { x: px(166), y: px(900), w: 5, h: 0.3, fontSize: 11, color: MUTE });
 [[400, "同学，记得戴好护目镜哦，眼睛只有一双。"], [640, "实验区不能吃东西喝水哦，请到室外再吃。"]].forEach((b) => {
   card(s, px(1080), px(b[0]), px(700), 1.25, { shadow: { type: "outer", color: "262E6E", blur: 16, offset: 5, angle: 90, opacity: 0.16 } });
   level(s, px(1080) + 0.25, px(b[0]) + 0.18, "y", "温和语气", 1.35);
@@ -235,14 +246,15 @@ orb(s, 213, 424, 0.24, "r");
 });
 
 s = slide("CONTENT", "面向学生", "学生是第一用户", "学生是第一用户：目标是减少火灾和伤害。每张实验桌一台终端，判断在本机完成，断网也照常工作。");
-T(s, "系统的首要目标是减少火灾和人身伤害，而不是记录违规。所以提醒先发给台前的学生，管理端只接收需要处理的事件。", { x: 0.83, y: 1.6, w: 10.5, h: 1, fontSize: 20 });
+T(s, "系统的首要目标是减少火灾和人身伤害，而不是记录违规。所以提醒先发给台前的学生，管理端只接收需要处理的事件。", { x: 0.83, y: 1.6, w: 6.6, h: 1.5, fontSize: 20 });
+shot(s, "kiosk-warning.png", 8.1, 1.4, 4.4, 0.6, "实机截图：实验台小屏，加热中无人值守、预测即将干烧");
 orb(s, 230, 860, 0.62, "g");
 [["每张实验桌一台终端", "RK3588 开发板、两路 USB 摄像头、控制盒与传感器、小屏；硬件采购估算 1000–1350 元"],
  ["判断在本机完成", "识别、打分和断电不依赖网络；与总后台断开时终端照常工作，恢复后自动重连"],
  ["小屏按现场设计", "按钮不小于 64 px，戴手套可操作；状态同时用颜色、形状和文字表示"]].forEach((f, i) => {
-  const x = px(330) + i * 3.3; s.addShape(pres.shapes.LINE, { x, y: px(620), w: 3.1, h: 0, line: { color: "DDE0EA", width: 0.75 } });
-  T(s, f[0], { x, y: px(620) + 0.2, w: 3.05, h: 0.5, fontSize: 20, bold: true, color: INK });
-  T(s, f[1], { x, y: px(620) + 0.75, w: 3.05, h: 1.3, fontSize: 15 });
+  const x = px(330) + i * 3.3; s.addShape(pres.shapes.LINE, { x, y: 4.6, w: 3.1, h: 0, line: { color: "DDE0EA", width: 0.75 } });
+  T(s, f[0], { x, y: 4.6 + 0.2, w: 3.05, h: 0.5, fontSize: 20, bold: true, color: INK });
+  T(s, f[1], { x, y: 4.6 + 0.75, w: 3.05, h: 1.3, fontSize: 15 });
 });
 
 s = slide("CONTENT", "面向学生", "第一个分叉：风险分三级", "第一个分叉：交叉验证是多源规则打分，不是机器学习里的交叉验证。30 分以下低危，70 分以上高危，低中危温和语气，高危严厉语气。");
@@ -272,16 +284,13 @@ s = slide("CONTENT", "面向学生", "第二个分叉：同一事件，三层各
 });
 T(s, "学生端计入全部因子；实验室老师只计入加热、温度、烟雾、断电和学生呼叫，行为违规仅作知会；实验楼只计入断电锁定和紧急事件。", { x: 0.83, y: px(910), w: 11.6, h: 0.7, fontSize: 16, color: INK });
 
-s = slide("CONTENT", "面向学生", "安全助手：只读，只建议", "安全助手读取打分结果和安全手册，写原因、步骤和条款；三条线路：通义千问、本地 Ollama、离线规则模板。工具表只有 4 个只读工具。");
-card(s, 0.83, 1.65, 6.25, 3.55);
-T(s, "处置建议", { x: 1.75, y: 1.85, w: 3, h: 0.45, fontSize: 22, bold: true, color: INK });
-T(s, "警告与紧急事件自动生成", { x: 4.3, y: 1.9, w: 2.55, h: 0.35, fontSize: 12, color: MUTE, align: "right" });
-orb(s, 226, 300, 0.2, "r");
-kv(s, 1.13, 2.5, 5.7, [["风险等级", "高危"], ["当前工况", "加热中（沸腾 / 高温阶段）"], ["主要依据", "越过沸点仍在升温；干烧风险分 0.70"], ["处置步骤", "1. 立即降低火力或补充液体；2. 回到实验台查看液面"], ["手册条款", "《实验室安全手册》1.3 沸腾阶段的注意事项"]], 1.4, 14);
-T(s, "读取交叉验证结果和安全手册（BM25 检索），生成原因、步骤和条款引用。工具表只有 4 个只读工具，没有任何电源控制接口。", { x: 7.6, y: 1.65, w: 4.9, h: 1.6, fontSize: 17 });
-kv(s, 7.6, 3.5, 4.9, [["远程通义千问", "联网"], ["本地 Ollama", "局域网"], ["规则模板", "离线兜底"]], 2.6, 17);
+s = slide("CONTENT", "面向学生", "安全助手：只读，只建议", "安全助手读取打分结果和安全手册，写原因、步骤和条款；三条线路：通义千问、本地 Ollama、离线规则模板。工具表只有 5 个只读工具。");
+shot(s, "advice-card.png", 0.83, 1.55, 4.75, 346 / 370, "实机截图：本机控制台事件卡片，处理建议由规则模板生成", "事件卡片：预测即将干烧，附处理建议的原因、处置和手册依据");
+orb(s, 900, 230, 0.2, "y");
+T(s, "读取交叉验证结果和安全手册（BM25 检索），生成原因、步骤和条款引用。工具表只有 5 个只读工具，没有任何电源控制接口。", { x: 6.4, y: 1.65, w: 6.1, h: 1.3, fontSize: 18 });
+kv(s, 6.4, 3.3, 6.1, [["远程通义千问", "联网"], ["本地 Ollama", "局域网"], ["规则模板", "离线兜底"]], 3.6, 17);
 
-s = slide("CONTENT", "面向学生", "最后一道防线：只断不通", "断电链路：开发板发 POWER_OFF，控制盒断继电器回 ACK，0.25 s 超时重发最多 3 次，往返中位 4.9 ms。控制盒另有 150℃、烟雾 2500、心跳 30 s 的本地硬规则。只断不通。");
+s = slide("CONTENT", "面向学生", "最后一道防线：只断不通", "断电链路：开发板发 POWER_OFF，控制盒断继电器回 ACK，0.25 s 超时重发，最多发送 3 次，往返中位 4.9 ms。控制盒另有 150℃、烟雾 2500、心跳 30 s 的本地硬规则。只断不通。");
 [["开发板", "规则判定需断电", 160], ["控制盒", "ESP32-S3", 810], ["加热电源", "已断开", 1460]].forEach((nd, i) => {
   card(s, px(nd[2]), px(300), px(300), 0.95);
   T(s, nd[0], { x: px(nd[2]), y: px(300) + 0.12, w: px(300), h: 0.4, fontSize: 19, color: INK, align: "center" });
@@ -289,14 +298,10 @@ s = slide("CONTENT", "面向学生", "最后一道防线：只断不通", "断�
   if (i < 2) { const x0 = px(nd[2] + 320), x1 = px([810, 1460][i] - 20); s.addShape(pres.shapes.LINE, { x: x0, y: px(300) + 0.48, w: x1 - x0, h: 0, line: { color: MUTE, width: 1.25, endArrowType: "triangle" } });
     T(s, ["POWER_OFF 0x02", "断开继电器"][i], { x: x0, y: px(300) + 0.08, w: x1 - x0, h: 0.3, fontSize: 12, align: "center", fontFace: MONO }); }
 });
-T(s, "控制盒回 ACK；0.25 s 未收到则重发，最多 3 次。真机实测 ACK 往返时延中位数 4.9 ms。", { x: 0.83, y: px(440), w: 11, h: 0.35, fontSize: 13, color: MUTE });
-card(s, px(160), px(560), px(480), px(330), { rectRadius: 0.22 });
-[0, 1, 2].forEach((k) => s.addShape(pres.shapes.OVAL, { x: px(210) + k * 0.35, y: px(610), w: 0.21, h: 0.21, fill: { color: "E3E6EF" }, line: { type: "none" } }));
-orb(s, 225, 625, 0.22, "r");
-s.addShape(pres.shapes.OVAL, { x: px(160 + 480 - 56 - 92), y: px(560 + 330 - 56 - 92), w: px(92), h: px(92), fill: { color: WHITE }, line: { color: "DDE0EA", width: 1.5 } });
-T(s, "长按 2 秒", { x: px(160 + 480 - 56 - 92), y: px(560 + 330 - 56 - 92), w: px(92), h: px(92), fontSize: 10, align: "center", valign: "middle" });
-T(s, "控制盒", { x: px(210), y: px(820), w: 1.5, h: 0.3, fontSize: 13, color: MUTE });
-[["开发板规则（可按区域调整）", "R1 热源 ≥ 120℃\nR3 加热中无人 60 s\nR5 烟雾读数 ≥ 1800", 720], ["控制盒本地硬规则（写在固件里）", "热源 ≥ 150℃\n烟雾读数 ≥ 2500\n心跳中断 30 s 且仍在加热", 1260]].forEach((r) => {
+T(s, "控制盒回 ACK；0.25 s 未收到则重发，最多发送 3 次。真机实测 ACK 往返时延中位数 4.9 ms。", { x: 0.83, y: px(440), w: 11, h: 0.35, fontSize: 13, color: MUTE });
+shot(s, "kiosk-locked.png", px(160), px(540), 3.4, 0.6, "实机截图：小屏断电锁定页");
+orb(s, 1610, 300, 0.22, "n", "加热电源指示");
+[["开发板规则（可按区域调整）", "R1 热源 ≥ 120℃\nR3 加热中无人 60 s\nR5 烟雾读数 ≥ 1800", 720], ["控制盒本地硬规则（写在固件里）", "热源 ≥ 150℃\n烟雾读数 ≥ 2500\n心跳中断 30 s 且热源 > 60℃", 1260]].forEach((r) => {
   s.addShape(pres.shapes.LINE, { x: px(r[2]), y: px(540), w: 3.5, h: 0, line: { color: "DDE0EA", width: 0.75 } });
   T(s, r[0], { x: px(r[2]), y: px(540) + 0.15, w: 3.5, h: 0.3, fontSize: 12, color: MUTE });
   T(s, r[1], { x: px(r[2]), y: px(540) + 0.48, w: 3.5, h: 1.1, fontSize: 16, color: INK, lineSpacingMultiple: 1.2 });
@@ -348,9 +353,9 @@ function mod(s, x, y, w, h, t, sub, core) {
   s.addText([{ text: t, options: { fontSize: 13, color: core ? WHITE : INK, breakLine: !!sub } }].concat(sub ? [{ text: sub, options: { fontSize: 9, color: core ? "A9B0D3" : MUTE, fontFace: MONO } }] : []),
     { isTextBox: true, x: x + 0.1, y, w: w - 0.2, h, margin: 0, valign: "middle" });
 }
-card(s, 0.83, 1.7, 2.7, 3.95); T(s, "控制盒", { x: 1.0, y: 1.85, w: 2.4, h: 0.4, fontSize: 20, bold: true, color: INK }); T(s, "ESP32-S3 · Arduino 固件", { x: 1.0, y: 2.25, w: 2.4, h: 0.25, fontSize: 10, color: MUTE, fontFace: MONO });
+card(s, 0.83, 1.7, 2.7, 3.95); T(s, "控制盒", { x: 1.0, y: 1.85, w: 2.4, h: 0.4, fontSize: 20, bold: true, color: INK }); T(s, "ESP32-S3，Arduino 固件", { x: 1.0, y: 2.25, w: 2.4, h: 0.25, fontSize: 11, color: MUTE });
 mod(s, 1.0, 2.6, 2.36, 0.85, "SHT30 温湿度\nMLX90614 红外测温\nMQ-2 烟雾"); mod(s, 1.0, 3.55, 2.36, 0.65, "继电器（加热电源）\n控制键、信号灯、蜂鸣器"); mod(s, 1.0, 4.3, 2.36, 0.6, "本地硬规则", "150℃ / 2500 / 心跳 30 s", true);
-card(s, 4.72, 1.7, 4.6, 3.95); T(s, "实验台终端", { x: 4.9, y: 1.85, w: 3, h: 0.4, fontSize: 20, bold: true, color: INK }); T(s, "RK3588 · Python · run_app.py", { x: 4.9, y: 2.25, w: 3.5, h: 0.25, fontSize: 10, color: MUTE, fontFace: MONO });
+card(s, 4.72, 1.7, 4.6, 3.95); T(s, "实验台终端", { x: 4.9, y: 1.85, w: 3, h: 0.4, fontSize: 20, bold: true, color: INK }); T(s, "RK3588，Python，run_app.py", { x: 4.9, y: 2.25, w: 3.5, h: 0.25, fontSize: 11, color: MUTE });
 mod(s, 4.9, 2.6, 2.07, 0.55, "识别线程", "dual_inference.py"); mod(s, 7.07, 2.6, 2.07, 0.55, "传感器线程", "sensor_worker.py");
 mod(s, 4.9, 3.25, 4.24, 0.62, "SafetyEngine：R1–R9 → 交叉验证 → 温度预测", "engine.py / state_machine.py / cross_check.py", true);
 mod(s, 4.9, 3.97, 2.07, 0.55, "事件中心", "语音、灯、截图、SQLite"); mod(s, 7.07, 3.97, 2.07, 0.55, "安全助手", "只读工具");
@@ -365,7 +370,7 @@ mod(s, 10.65, 2.6, 1.7, 0.55, "FastAPI", ":8200"); mod(s, 10.65, 3.25, 1.7, 0.75
 T(s, "安全判断不依赖任何界面：小屏、本机控制台和总后台都只读取 SafetyEngine.snapshot()。", { x: 0.83, y: 5.95, w: 11, h: 0.35, fontSize: 13, color: MUTE });
 orb(s, 1196, 296, 0.2, "g");
 
-s = slide("CONTENT", "工程实现", "程序卡死也能断电：心跳由安全判断驱动", "心跳不是定时器发的：只有安全判断每次跑完调用 feed()，发送线程才发心跳。程序卡死 5 s 心跳就停，控制盒 30 s 收不到心跳且仍在加热就本地断电。");
+s = slide("CONTENT", "工程实现", "程序卡死也能断电：心跳由安全判断驱动", "心跳不是定时器发的：只有安全判断每次跑完调用 feed()，发送线程才发心跳。程序卡死 5 s 心跳就停，控制盒 30 s 收不到心跳、继电器闭合且热源高于 60℃（测不到温度也算）就本地断电。");
 code(s, 0.83, 1.52, 6.15, "① R3 加热中无人值守", "src/core/state_machine.py", "L250–260 节选",
 `cut_s = rules("unattended_heating_cut_s", 60.0)
 if heating and macro_unattended:
@@ -390,14 +395,14 @@ def engine_alive(self) -> bool:
 # 发送线程（L421）
 if self.engine_alive and (...):
     # 发出 HEARTBEAT`, 11);
-code(s, 0.83, 4.95, 11.67, "③ 控制盒：心跳中断 30 s 且仍在加热，本地断电", "firmware/lab_guard_esp32/lab_guard_esp32.ino", "L254–257",
+code(s, 0.83, 4.95, 11.67, "③ 控制盒：心跳中断 30 s 且热源 > 60℃，本地断电", "firmware/lab_guard_esp32/lab_guard_esp32.ino", "L254–257",
 `if (mlxOk && !isnan(objC) && objC >= HARD_LIMIT_C) cutPower(CUT_OVERTEMP, EV_LOCAL_OVERTEMP);
 if (smokeReady() && smokeRaw >= SMOKE_LIMIT_RAW)   cutPower(CUT_SMOKE, EV_LOCAL_SMOKE);
 bool hot = !mlxOk || isnan(objC) || objC > WATCHDOG_HOT_C;   // 测不到温度时按"可能很热"保守处理
 if (relayOn && millis() - lastHb > WATCHDOG_CUT_MS && hot) cutPower(CUT_WATCHDOG, EV_WATCHDOG);`, 11);
 orb(s, 160, 722, 0.2, "r");
 
-s = slide("CONTENT", "工程实现", "串口协议：定长帧头 + CRC16 + ACK 重发", "帧格式：AA 55 帧头、长度、序号、命令、负载、CRC16-CCITT 小端。断电指令要 ACK，0.25 s 超时重发，最多 3 次。固件和仿真下位机共用这一协议。");
+s = slide("CONTENT", "工程实现", "串口协议：定长帧头 + CRC16 + ACK 重发", "帧格式：AA 55 帧头、长度、序号、命令、负载、CRC16-CCITT 小端。断电指令要 ACK，0.25 s 超时重发，最多发送 3 次。固件和仿真下位机共用这一协议。");
 T(s, "示例：POWER_OFF 指令，原因码 4（执行上位机断电），115200 波特", { x: 0.83, y: 1.4, w: 10, h: 0.3, fontSize: 12, color: MUTE });
 let bx = 0.83;
 [["AA", "帧头", 0.97, "hdr"], ["55", "帧头", 0.97, "hdr"], ["01", "LEN", 0.97], ["2A", "SEQ", 0.97], ["02", "CMD", 0.97, "cmd"], ["04", "PAYLOAD", 1.53], ["95", "CRC 低字节", 0.97, "crc"], ["95", "CRC 高字节", 0.97, "crc"]].forEach((b) => {
@@ -424,7 +429,7 @@ def build_frame(seq: int, cmd: int, payload: bytes = b"") -> bytes:
     body = bytes([len(payload), seq & 0xFF, cmd]) + payload
     return HEADER + body + struct.pack("<H", crc16_ccitt(body))`, 10);
 kv(s, 7.45, 3.35, 5.05, [["ACK 超时", "ACK_TIMEOUT_S = 0.25", 1], ["最多发送", "ACK_MAX_TRIES = 3", 1], ["结果", "power_off_state 记录是否被确认"], ["一致性", "固件与 tests/fake_mcu.py 用同一协议"]], 1.35, 15);
-T(s, "接收端按帧头重新同步，半个包头会保留到下一次读取；CRC 错误计数可在控制台查看。", { x: 7.45, y: 5.4, w: 5.05, h: 0.7, fontSize: 12, color: MUTE });
+T(s, "接收端按帧头重新同步：长度非法或 CRC 错误的帧直接丢弃，不完整的帧留到下一次读取再拼接。", { x: 7.45, y: 5.4, w: 5.05, h: 0.7, fontSize: 12, color: MUTE });
 
 s = slide("CONTENT", "工程实现", "分层上报的实现：同一份打分，三次过滤", "分层上报只是在同一份打分上做三次过滤：老师层去掉行为因子，实验楼层只看断电锁定和紧急事件。等级随快照上报，不参与断电。");
 code(s, 0.83, 1.6, 7.45, "tiers()", "src/core/cross_check.py", "L166–191 节选",
@@ -488,7 +493,7 @@ orb(s, 1096, 399, 0.18, "g");
   T(s, r[0], { x: px(r[2]) + 0.18, y: px(r[3]) + 0.12, w: px(360) - 0.36, h: 0.38, fontSize: 17, bold: true, color: INK });
   T(s, r[1], { x: px(r[2]) + 0.18, y: px(r[3]) + 0.5, w: px(360) - 0.36, h: 0.4, fontSize: 11 });
 });
-s.addText("防患于未然", { isTextBox: true, x: 1, y: px(872), w: 11.33, h: 0.6, fontSize: 30, bold: true, color: INK, align: "center", margin: 0 });
+s.addText("防患于未然", { isTextBox: true, x: 1, y: px(872), w: 11.33, h: 0.6, fontSize: 30, bold: true, fontFace: HEAD, color: INK, align: "center", margin: 0 });
 T(s, "基于双摄协同的实验室安全事前干预监测系统", { x: 1, y: px(872) + 0.6, w: 11.33, h: 0.3, fontSize: 13, color: MUTE, align: "center" });
 
 (async () => {
