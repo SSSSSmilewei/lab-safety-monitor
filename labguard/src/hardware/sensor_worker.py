@@ -3,9 +3,9 @@
 src/hardware/sensor_worker.py
 
 数据来源（按优先级自动切换，每个周期都会重新检查，支持热插拔）：
-  1. 下位机串口（SerialComm 单例）：SHT30 温湿度 + MLX90614 热源温度 + MQ-2 烟雾
+  1. 下位机串口（SerialComm 单例）：SHT30 台面温湿度 + MQ-2 烟雾
   2. 网页大屏「演示数据」写入的 IPC 文件（src/core/demo.py）（仅在未接入下位机、且 config.demo.allow_ipc_telemetry 为 true 时）
-  3. 内部自主模拟（温湿度在 25℃ / 55% 附近轻微抖动；热源温度与烟雾标记为"未接入"）
+  3. 内部自主模拟（温湿度在 25℃ / 55% 附近轻微抖动；烟雾标记为"未接入"）
 
 本线程不再自己打开串口：串口统一由 SerialComm 管理，避免两个模块争抢同一端口。
 对外的信号与属性保持不变：sensor_data_updated(float, float)、mode_changed(bool, str)、
@@ -142,8 +142,7 @@ class SensorWorker(QThread):
                 self._switch_mode(MODE_HARDWARE, f"已接入下位机实时遥测（{link.port}）")
                 if hw["ts"] != self._last_hw_ts:
                     self._last_hw_ts = hw["ts"]
-                    telemetry.update(SOURCE_HARDWARE, temp=hw["temp"], humi=hw["humi"],
-                                     obj_temp=hw["obj_temp"], smoke=hw["smoke"])
+                    telemetry.update(SOURCE_HARDWARE, temp=hw["temp"], humi=hw["humi"], smoke=hw["smoke"])
                     if hw["temp"] is not None and hw["humi"] is not None:
                         self.sensor_data_updated.emit(round(hw["temp"], 1), round(hw["humi"], 1))
                     else:
@@ -156,10 +155,8 @@ class SensorWorker(QThread):
                 scenario = ext.get("scenario", "")
                 self._switch_mode(MODE_IPC, f"未接入下位机，使用环境模拟控制器数据（{scenario or '实时调控'}）")
                 t, h = float(ext["temp"]), float(ext["humi"])
-                obj = ext.get("obj_temp")
                 smk = ext.get("smoke")
                 telemetry.update(SOURCE_IPC, temp=t, humi=h,
-                                 obj_temp=float(obj) if obj is not None else None,
                                  smoke=int(smk) if smk is not None else None)
                 self.sensor_data_updated.emit(round(t, 1), round(h, 1))
                 self._sleep(100)
@@ -169,7 +166,7 @@ class SensorWorker(QThread):
             self._switch_mode(MODE_SIM, f"{status}，切换为自主模拟遥测（仅用于界面演示）")
             t = max(24.0, min(26.0, self._sim_temp_base + random.gauss(0.0, 0.25)))
             h = max(50.0, min(60.0, self._sim_humi_base + random.gauss(0.0, 0.8)))
-            telemetry.update(SOURCE_SIMULATED, temp=t, humi=h, obj_temp=None, smoke=None)
+            telemetry.update(SOURCE_SIMULATED, temp=t, humi=h, smoke=None)
             self.sensor_data_updated.emit(round(t, 1), round(h, 1))
             self._sleep(1000)
 

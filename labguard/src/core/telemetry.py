@@ -3,7 +3,7 @@
 src/core/telemetry.py
 
 SensorWorker 负责写入，状态机与推理日志负责读取。
-这样状态机可以拿到界面层不传递的额外通道（热源温度、烟雾），而不需要修改界面代码。
+这样状态机可以拿到界面层不传递的额外通道（烟雾），而不需要修改界面代码。
 """
 import time
 import threading
@@ -20,9 +20,8 @@ class TelemetryStore:
     def __init__(self):
         self._lock = threading.Lock()
         self._data: Dict[str, Any] = {
-            "temp": None,       # 环境温度 ℃（SHT30）
+            "temp": None,       # 台面温度 ℃（SHT30，放在加热器旁）
             "humi": None,       # 相对湿度 %（SHT30）
-            "obj_temp": None,   # 热源表面温度 ℃（MLX90614），None = 未接入
             "smoke": None,      # MQ-2 原始 ADC，None = 未接入或未预热
             "source": SOURCE_NONE,
             "ts": 0.0,

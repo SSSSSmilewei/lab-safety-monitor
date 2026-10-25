@@ -19,10 +19,11 @@ LabSafetyMonitor/serial_comm.py
     0x02 POWER_OFF   payload: [reason u8]        需要 ACK
     0x03 PLAY_VOICE  payload: [track u8]         DFPlayer 曲目号
 下位机 → 上位机：
-    0x10 TELEMETRY   payload: <h temp*10, H humi*10, h obj_temp*10, H smoke_raw, B flags, B cut_reason>
-                     无效值：temp/obj_temp = 0x7FFF，humi/smoke = 0xFFFF
+    0x10 TELEMETRY   payload: <h temp*10, H humi*10, h 保留*10, H smoke_raw, B flags, B cut_reason>
+                     temp 为台面温度（SHT30）；"保留"原为红外热源温度，红外已删除，固件固定发 0x7FFF
+                     无效值：temp = 0x7FFF，humi/smoke = 0xFFFF
                      flags: bit0 继电器闭合  bit1 断电锁定  bit2 心跳正常  bit3 SHT30 正常
-                            bit4 MLX90614 正常  bit5 MQ-2 已预热  bit6 本地告警中
+                            bit4 保留（恒为 0）  bit5 MQ-2 已预热  bit6 本地告警中
     0x11 ACK         payload: <B seq, B cmd, B result>
     0x12 EVENT       payload: <B code, h value>
 
@@ -70,7 +71,7 @@ INVALID_U16 = 0xFFFF
 # 断电原因码（POWER_OFF 的 payload，以及遥测里的 cut_reason）
 CUT_REASONS = {
     0: "无",
-    1: "热源超温（下位机本地规则）",
+    1: "台面超温（下位机本地规则）",
     2: "烟雾超标（下位机本地规则）",
     3: "上位机失联兜底（下位机看门狗）",
     4: "上位机视觉 + 遥测联合决策",
@@ -78,9 +79,9 @@ CUT_REASONS = {
 }
 # 下位机主动上报的事件码
 EVENT_CODES = {
-    1: "下位机本地断电：热源超温",
+    1: "下位机本地断电：台面超温",
     2: "下位机本地断电：烟雾超标",
-    3: "下位机看门狗断电：上位机失联且仍在加热",
+    3: "下位机看门狗断电：上位机失联且继电器闭合",
     4: "下位机已执行上位机断电指令",
     5: "现场复位键：已解除锁定并恢复供电",
     6: "现场复位被拒绝：危险尚未解除",

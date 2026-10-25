@@ -57,13 +57,13 @@
       </div>
       <div class="mid">
         <div class="card heat" id="heatCard">
-          <div class="h1"><span>热源表面温度 · MLX90614</span><span id="heatThr">干烧阈值 —</span></div>
-          <div class="val"><b id="heatVal">--.-</b><span>℃</span><span class="chip" id="heatTag">未接入</span></div>
-          <svg id="heatSpark" viewBox="0 0 320 48" preserveAspectRatio="none" role="img" aria-label="热源温度最近一分钟曲线与预测"></svg>
+          <div class="h1"><span>台面温度 · SHT30</span><span id="heatThr">断电线 —</span></div>
+          <div class="val"><svg class="thermo" id="heatThermo" viewBox="0 0 24 64" role="img" aria-label="台面温度计"></svg><b id="heatVal">--.-</b><span>℃</span><span class="chip" id="heatTag">无数据</span></div>
+          <svg id="heatSpark" viewBox="0 0 320 48" preserveAspectRatio="none" role="img" aria-label="台面温度最近两分钟曲线与预测"></svg>
           <div id="heatEta" style="font-size:13px">—</div>
         </div>
         <div class="tiles">
-          <div class="tile" id="tTemp"><div><div class="lab">环境温度</div><div class="v">--</div></div><div class="hint"></div></div>
+          <div class="tile" id="tTemp"><div><div class="lab">升温速度</div><div class="v">--</div></div><div class="hint"></div></div>
           <div class="tile" id="tHumi"><div><div class="lab">相对湿度</div><div class="v">--</div></div><div class="hint"></div></div>
           <div class="tile" id="tSmoke"><div><div class="lab">烟雾 MQ-2</div><div class="v">--</div></div><div class="hint"></div></div>
         </div>
@@ -113,7 +113,7 @@
       <div class="sec-t">▌安全规则与视觉阈值<small>修改即时生效，并保存到 runtime/config_override.yaml</small></div>
       <div class="form-grid" id="cfgForm"></div>
       <div class="row" style="margin-top:12px"><button class="btn ok" id="cfgSave">保存修改</button><span class="muted" id="cfgMsg"></span></div>
-      <div class="note-box" style="margin-top:10px">下位机本地硬规则（热源 150℃、烟雾 2500、30 秒失联看门狗）写在固件里，总后台不能修改 —— 这是最后一道防线。</div>
+      <div class="note-box" style="margin-top:10px">下位机本地硬规则（台面温度 70℃、烟雾 2500、继电器闭合时 30 秒失联看门狗）写在固件里，总后台不能修改 —— 这是最后一道防线。</div>
     </div>
     <div class="page">
       <div class="card pad">
@@ -163,7 +163,7 @@
     <div class="card pad">
       <div class="sec-t">▌安全助手<small id="agentRouteNow">—</small></div>
       <div class="chat" id="chat">
-        <div class="bubble">你好，我是实验室安全助手。可以问我：「现在安全吗？」「刚才为什么断电？」「干烧怎么处置？」<small>我只给建议，没有控制电源的能力。</small></div>
+        <div class="bubble">你好，我是实验室安全助手。可以问我：「现在安全吗？」「刚才为什么断电？」「台面超温怎么处置？」<small>我只给建议，没有控制电源的能力。</small></div>
       </div>
       <div class="row" style="margin-top:10px"><input type="text" id="ask" class="grow" placeholder="输入问题，回车发送" aria-label="向 Agent 提问"><button class="btn primary" id="askBtn">发送</button><button class="btn" id="reportBtn">生成实验安全报告</button></div>
     </div>
@@ -201,12 +201,12 @@
   <!-- ================= 世界模型 ================= -->
   <section id="tab-wm" class="page hidden">
     <div class="card pad">
-      <div class="sec-t">▌热源温度预测<small>实线：实测 · 虚线：预测未来 120 秒 · 红线：干烧阈值</small></div>
-      <svg class="bigchart" id="wmChart" viewBox="0 0 900 300" preserveAspectRatio="none" role="img" aria-label="热源温度实测与预测曲线"></svg>
+      <div class="sec-t">▌台面温度趋势<small>实线：实测 · 虚线：预测未来 120 秒 · 黄线：偏高提醒 · 红线：断电线</small></div>
+      <svg class="bigchart" id="wmChart" viewBox="0 0 900 300" preserveAspectRatio="none" role="img" aria-label="台面温度实测与预测曲线"></svg>
       <div class="page cols3" style="margin-top:12px">
         <div class="kv" id="wmKv"></div>
-        <div><div class="muted">干烧风险分</div><div class="bar" style="margin-top:6px"><i id="wmRisk" style="width:0"></i></div><div id="wmRiskTxt" class="muted" style="margin-top:4px">—</div></div>
-        <div class="note-box">升温段用一阶热平衡模型 dT/dt=(T∞−T)/τ 在线辨识，外推干烧倒计时；沸腾段温度停在 100℃ 附近，改用"平台持续时长"估计烧干风险。预测只用于提前提醒，不参与断电。</div>
+        <div><div class="muted">超温风险分</div><div class="bar" style="margin-top:6px"><i id="wmRisk" style="width:0"></i></div><div id="wmRiskTxt" class="muted" style="margin-top:4px">—</div></div>
+        <div class="note-box">温度计（SHT30）放在加热器旁 5～10 cm。用最近 60 秒的台面温度做直线拟合得到升温速度，按当前速度外推到达偏高提醒线和断电线的时间。预测只用于提前提醒，不参与断电。</div>
       </div>
     </div>
     <div class="card pad">
@@ -245,9 +245,8 @@
       <div class="form-grid" id="demoBtns"></div>
       <div class="sec-t" style="margin-top:16px">▌自定义数值</div>
       <div class="form-grid">
-        <label class="f">环境温度 ℃<input type="number" id="cT" value="25"></label>
+        <label class="f">台面温度 ℃<input type="number" id="cT" value="25"></label>
         <label class="f">湿度 %<input type="number" id="cH" value="55"></label>
-        <label class="f">热源温度 ℃（空=未接入）<input type="number" id="cO"></label>
         <label class="f">烟雾（空=未接入）<input type="number" id="cS"></label>
       </div>
       <div class="row" style="margin-top:10px"><button class="btn" id="demoCustom">注入自定义</button><button class="btn danger" id="demoStop">停止注入</button></div>

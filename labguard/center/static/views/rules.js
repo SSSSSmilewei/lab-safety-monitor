@@ -3,9 +3,9 @@
   'use strict';
   var LG = window.LG, esc = LG.esc, icon = LG.icon;
   var META = null;          // /api/presets
-  var CUT = { 'rules.dry_burn_c': 1, 'rules.unattended_heating_cut_s': 1, 'rules.smoke_raw': 1 };
-  var CENTER_MAX = { 'rules.dry_burn_c': 300, 'rules.smoke_raw': 4000 };   // 总后台放宽到的上限；各终端再按自己的控制盒校验
-  var RANGE_TEXT = { 'rules.dry_burn_c': '80–硬上限−5', 'rules.smoke_raw': '300–硬上限−100' };
+  var CUT = { 'rules.overtemp_cut_c': 1, 'rules.unattended_heating_cut_s': 1, 'rules.smoke_raw': 1 };
+  var CENTER_MAX = { 'rules.overtemp_cut_c': 300, 'rules.smoke_raw': 4000 };   // 总后台放宽到的上限；各终端再按自己的控制盒校验
+  var RANGE_TEXT = { 'rules.overtemp_cut_c': '40–硬上限−5', 'rules.smoke_raw': '300–硬上限−100' };
   var st = { sel: null };
 
   function bare(label) { return label.replace(/（.*?）/g, '').trim(); }
@@ -97,7 +97,7 @@
       '<button class="btn" id="rlClear"' + (Object.keys(m.prof.own.rules).length || m.prof.own.preset ? '' : ' disabled') + '>' + icon('reset') + '清除本级设置</button>' +
       '<span class="mut">本级覆盖 <span class="num">' + Object.keys(m.draft).length + '</span> 项' + (m.prof.own.updated ? ' · 最近修改 ' + esc(m.prof.own.updated_by) + ' ' + LG.time(m.prof.own.updated) : '') + '</span></div></section>' +
       '<section class="panel" aria-label="硬件上限校验"><div class="ph rd">' + icon('chip') + '硬件上限校验<span class="sp"></span><small>控制盒固件限值 · 不可远程修改</small></div>' +
-      '<div class="tbwrap"><table class="tb" style="min-width:640px"><thead><tr><th>实验桌</th><th>终端</th><th>热源硬上限</th><th>烟雾硬上限</th><th>结果</th><th>状态</th></tr></thead><tbody>' + limits + '</tbody></table></div></section>' +
+      '<div class="tbwrap"><table class="tb" style="min-width:640px"><thead><tr><th>实验桌</th><th>终端</th><th>台面温度硬上限</th><th>烟雾硬上限</th><th>结果</th><th>状态</th></tr></thead><tbody>' + limits + '</tbody></table></div></section>' +
       '<section class="panel" aria-label="交叉验证参数"><div class="ph dk">' + icon('chat') + '安全助手参数<span class="sp"></span><small>仅影响问答与处置建议，不参与断电</small></div>' + agent + '</section>';
 
     var body = LG.$('#rlBody');

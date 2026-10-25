@@ -4,7 +4,7 @@ src/ui/kiosk.py
 
 定位：面向正在做实验的同学，"自我管理"——一眼看清自己现在的风险、该做什么，主动规避危险。
   · 一眼看懂：顶栏状态（颜色 + √/▲/■ 形状 + 文字三重编码）；守护页左侧「待处理事项」直接给出动作
-    （来自交叉验证的每条依据，例如"佩戴护目镜""移出量器，改用烧杯加热"）；中间热源大数字与干烧预测；右侧防护装备与环境；
+    （来自交叉验证的每条依据，例如"佩戴护目镜""移出量器，改用烧杯加热"）；中间台面温度计、大数字与超温预测；右侧防护装备与环境；
   · 戴手套也能点：按钮 ≥ 64px（800×480 基准），只有 3 个页签 + 3 个常驻操作；
   · 紧急时整屏接管：断电锁定后红色全屏提示恢复步骤（排查后按控制盒复位键）；
   · 分辨率自适应：以 800×480 为设计基准按短边等比缩放（480×320 ~ 1024×600），竖屏自动改为上下布局；
@@ -72,14 +72,57 @@ def todo_items(s: dict, limit: int = 3) -> list:
     return out[:limit]
 
 
+class Thermo(QWidget):
+    """竖直温度计：液柱高度 = 台面温度，刻度线标出偏高提醒线（黄）与断电线（红）。只在数据变化时重画"""
+
+    LO, HI = 10.0, 70.0
+
+    def __init__(self, ink="#1A1F3D", parent=None):
+        super().__init__(parent)
+        self.temp, self.warn, self.cut, self.color, self.ink = None, 40.0, 55.0, T.SAFE, ink
+
+    def set_data(self, temp, warn, cut, color):
+        key = (temp, warn, cut, color)
+        if key == (self.temp, self.warn, self.cut, self.color):
+            return
+        self.temp, self.warn, self.cut, self.color = key
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        bulb = min(w * 0.9, h * 0.3)
+        tube = bulb * 0.45
+        cx = w / 2
+        top, bottom = 4.0, h - bulb - 2
+        y = lambda v: bottom - (bottom - top) * (max(self.LO, min(self.HI, v)) - self.LO) / (self.HI - self.LO)
+        p.setPen(QPen(QColor(self.ink), 2))
+        p.setBrush(QColor("#FFFFFF"))
+        p.drawRoundedRect(QRectF(cx - tube / 2, top - 2, tube, bottom - top + tube), tube / 2, tube / 2)
+        p.drawEllipse(QRectF(cx - bulb / 2, h - bulb - 2, bulb, bulb))
+        fill = QColor(self.color if self.temp is not None else "#C5CAE9")
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(fill)
+        inset = 3
+        p.drawEllipse(QRectF(cx - bulb / 2 + inset, h - bulb - 2 + inset, bulb - 2 * inset, bulb - 2 * inset))
+        if self.temp is not None:
+            yt = y(self.temp)
+            p.drawRect(QRectF(cx - tube / 2 + inset, yt, tube - 2 * inset, bottom - yt + tube / 2))
+        for v, col in ((self.warn, T.WARN), (self.cut, T.DANGER)):
+            p.setPen(QPen(QColor(col), 3))
+            p.drawLine(QPointF(cx - tube / 2 - 6, y(v)), QPointF(cx + tube / 2 + 6, y(v)))
+        p.end()
+
+
 class Spark(QWidget):
-    """热源温度迷你曲线：实测（实线）+ 世界模型预测（虚线）+ 干烧阈值（红虚线）"""
+    """台面温度迷你曲线：实测（实线）+ 趋势预测（虚线）+ 断电线（红虚线）"""
 
     def __init__(self, line_color=T.PRIMARY, parent=None):
         super().__init__(parent)
         self.hist = deque(maxlen=120)
         self.forecast = []
-        self.threshold = 120.0
+        self.threshold = 55.0
         self.line_color = line_color
 
     def set_data(self, temp, forecast, threshold):
@@ -394,11 +437,15 @@ class KioskWindow(QWidget):
         self.todo.body.addWidget(self.todo_foot)
         lay.addWidget(self.todo, 3)
 
-        # 中：热源温度
+        # 中：台面温度计
         self.heat = self._card(offset=self.px(4), padding=(self.px(12), self.px(8), self.px(12), self.px(8)))
         self.heat.body.setSpacing(self.px(2))
-        self.heat_hdr = self._lbl("热源表面温度", 13, self.DIM)
+        self.heat_hdr = self._lbl("台面温度", 13, self.DIM)
         vrow = QHBoxLayout()
+        self.thermo = Thermo(self.LINE)
+        self.thermo.setFixedSize(self.px(30), self.px(86))
+        vrow.addWidget(self.thermo)
+        vrow.addSpacing(self.px(6))
         self.heat_val = self._lbl("--.-", 60, kind="num")
         self.heat_unit = self._lbl("℃", 22)
         self.heat_tag = Chip("未接入", self.INK, T.PRIMARY_SOFT, size=self.px(14))
@@ -435,7 +482,7 @@ class KioskWindow(QWidget):
         right.addWidget(ppe_card, 3)
 
         env = self._card(offset=self.px(4), padding=(self.px(10), self.px(6), self.px(10), self.px(6)))
-        self.env_lbl = self._lbl("环境 --℃\n湿度 --%\n烟雾 --", 14, kind="num")
+        self.env_lbl = self._lbl("湿度 --%\n烟雾 --", 14, kind="num")
         self.env_lbl.setWordWrap(True)
         self.act_lbl = self._lbl("排风 — · 加湿 —", 12, self.DIM)
         env.body.addWidget(self.env_lbl)
@@ -607,7 +654,7 @@ class KioskWindow(QWidget):
         lv = "high" if s.get("latched") else risk.get("level", "low")
         items = todo_items(s)
         r = s["rules"]
-        heating = (s["telemetry"].get("obj_temp") or 0) >= r["heating_on_c"]
+        heating = bool(s.get("heating"))
         foot = (f"加热中：离岗 {cfg('presence.absent_seconds', 15):.0f} s 判定无人 · "
                 f"{r['unattended_heating_cut_s']:.0f} s 后自动断电") if heating else ""
         key = (lv, tuple(items), foot)
@@ -637,31 +684,37 @@ class KioskWindow(QWidget):
         t = s["telemetry"]
         wm = s["world_model"]
         r = s["rules"]
-        obj = t.get("obj_temp")
-        thr = r["dry_burn_c"]
-        self.heat_hdr.setText(f"热源温度 · 断电 {thr:.0f}℃")
+        if t.get("source") == "simulated":      # 没接控制盒：模拟温度只用于维持界面，不当实测值显示
+            obj = None
+        else:
+            obj = t.get("temp")
+        thr = r["overtemp_cut_c"]
+        warn_c = r["ambient_high_c"]
+        self.heat_hdr.setText(f"台面温度 · 提醒 {warn_c:.0f}℃ · 断电 {thr:.0f}℃")
         self.heat_val.setText("--.-" if obj is None else f"{obj:.1f}")
-        lv, tag, eta = "ok", "√ 常温", "未在加热 · 无干烧风险"
+        lv, tag, eta = "ok", "√ 常温", "温度稳定 · 无超温风险"
         if obj is None:
-            tag, eta = "未接入", "未接入热源测温"
+            tag, eta = "无数据", "控制盒未接入或温度计无数据"
         elif obj >= thr:
-            lv, tag, eta = "bad", "■ 干烧", "已超过干烧阈值"
-        elif obj >= r["heating_on_c"]:
-            tag = "▲ " + (wm.get("phase_text") or "加热中")
-            if wm.get("eta_s") is not None:
-                eta = f"越过沸点仍在升温 · 约 {wm['eta_s']:.0f} 秒后干烧"
+            lv, tag, eta = "bad", "■ 超温", "已超过断电线"
+        else:
+            if obj >= warn_c:
+                lv, tag = "warn", "▲ 偏高"
+            elif s.get("heating"):
+                tag = "▲ 加热中"
+            elif wm.get("phase") not in (None, "no_sensor", "idle", "steady"):
+                tag = wm.get("phase_text") or tag
+            rate = wm.get("slope_per_min")
+            if wm.get("eta_s") is not None and wm.get("phase") == "heating":
+                eta = f"升温 {rate:.1f}℃/min · 约 {wm['eta_s']:.0f} 秒后到断电线"
                 if wm["eta_s"] <= r["predict_eta_warn_s"]:
-                    lv = "warn"
-            elif wm.get("eta_boil_s") is not None:
-                eta = f"预计约 {wm['eta_boil_s']:.0f} 秒后沸腾"
-            elif wm.get("phase") == "boiling":
-                eta = f"沸腾 {wm['plateau_s']:.0f} 秒 · 请留意液面"
-            elif 90 <= obj < 104:
-                eta = "接近沸点"
-            elif wm.get("t_inf") is not None and wm["t_inf"] < 90:
-                eta = f"将稳定在约 {wm['t_inf']:.0f}℃"
-            else:
+                    lv = "bad" if lv == "bad" else "warn"
+            elif rate is not None and rate <= -0.3:
+                eta = f"降温中 · {rate:.1f}℃/min"
+            elif wm.get("phase") == "warming_up":
                 eta = "温度预测采样中…"
+            elif obj >= warn_c:
+                eta = "高于提醒线 · 请检查加热器与通风"
         bg = {"ok": T.PAPER, "warn": T.WARN_SOFT, "bad": T.DANGER_SOFT}[lv]
         if self.pixel:
             border = {"ok": T.PRIMARY, "warn": T.WARN, "bad": T.DANGER}[lv]
@@ -677,6 +730,7 @@ class KioskWindow(QWidget):
         self.heat_eta.setText(eta)
         self._restyle(self.heat_eta, 15, {"ok": self.INK, "warn": T.WARN_TEXT, "bad": T.DANGER_DEEP}[lv])
         self.spark.set_data(obj, wm.get("forecast"), thr)
+        self.thermo.set_data(obj, warn_c, thr, {"ok": T.SAFE, "warn": T.WARN, "bad": T.DANGER}[lv])
 
         v = s["vision"]
         if v["person_present"] is None:
@@ -706,7 +760,7 @@ class KioskWindow(QWidget):
             t = {}
         smoke = t.get("smoke")
         sep = " · " if self.pixel else "\n"     # 像素字体行距紧，沿用旧版单行写法
-        self.env_lbl.setText(f"环境 {f(t.get('temp'), 1, '℃')}{sep}湿度 {f(t.get('humi'), 0, '%')}{sep}"
+        self.env_lbl.setText(f"湿度 {f(t.get('humi'), 0, '%')}{sep}"
                              f"烟雾 {smoke if smoke is not None else '--'}")
         env = s.get("env") or {}
         if env:

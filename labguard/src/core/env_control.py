@@ -25,10 +25,13 @@ from src.core.telemetry import telemetry
 
 def control_law(temp: Optional[float], humi: Optional[float], smoke: Optional[int],
                 t_set: float, h_low: float, h_high: float, smoke_fan_raw: float,
-                prev_fan: int = 0, prev_humid: bool = False) -> Tuple[int, bool, str]:
-    """返回 (fan_pwm 0-100, humid_on, 原因说明)"""
+                prev_fan: int = 0, prev_humid: bool = False,
+                button_cut: bool = False) -> Tuple[int, bool, str]:
+    """返回 (fan_pwm 0-100, humid_on, 原因说明)。button_cut = 现场长按控制键断电后仍处于锁定"""
     if smoke is not None and smoke >= smoke_fan_raw:
         return 100, False, "烟雾超标：排风满速，禁止加湿"
+    if button_cut:
+        return 100, False, "现场按键断电：排风满速，直到复位"
     fan, reasons = 0, []
     if temp is not None and temp > t_set + 1:
         fan = max(fan, min(100, int(40 + 20 * (temp - t_set - 1))))

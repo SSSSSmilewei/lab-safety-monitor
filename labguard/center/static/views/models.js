@@ -74,17 +74,17 @@
     '<section class="panel" aria-label="交叉验证规则" style="flex:1 1 520px"><div class="ph dk">' + icon('layers') + '交叉验证 · 风险因子权重<span class="sp"></span><small>默认中危 ≥ 30 · 高危 ≥ 70 · 可按区域调整</small></div>' +
     '<table class="tb"><thead><tr><th>数据源</th><th>风险因子</th><th>分值</th></tr></thead><tbody>' +
     [['人员 × 传感器', '加热中台前无人', '70'], ['人员 × 传感器', '加热中人员伏案', '70'], ['人员 × 器皿', '台面有试剂或加热中出现饮食', '60'],
-      ['器皿 × 传感器', '加热时台面有不可加热量器', '35'], ['器皿 × 传感器', '加热中器皿靠近桌边', '35'], ['人员 × 传感器', '加热 / 沸腾中未佩戴护目镜或手套', '30–35'],
-      ['人员 × 器皿', '台面有器皿时未佩戴防护', '15'], ['温度预测', '干烧风险分 ≥ 0.6 / ≥ 0.3', '70 / 30'], ['规则引擎', '紧急事件或断电锁定 / 警告事件', '100 / 40']].map(function (r) {
+      ['器皿 × 传感器', '加热时台面有不可加热量器', '35'], ['器皿 × 传感器', '加热中器皿靠近桌边', '35'], ['人员 × 传感器', '加热 / 高温阶段未佩戴护目镜或手套', '30–35'],
+      ['人员 × 器皿', '台面有器皿时未佩戴防护', '15'], ['温度预测', '超温风险分 ≥ 0.6 / ≥ 0.3', '70 / 30'], ['规则引擎', '紧急事件或断电锁定 / 警告事件', '100 / 40']].map(function (r) {
       return '<tr><td><span class="tag ' + (/×/.test(r[0]) ? 't-ink' : 't-soft') + '">' + r[0] + '</span></td><td>' + r[1] + '</td><td class="num">' + r[2] + '</td></tr>';
     }).join('') + '</tbody></table></section>' +
     '<section class="panel" aria-label="主控决策规则" style="flex:1 1 520px"><div class="ph rd">' + icon('chip') + '主控决策 · 规则与执行<span class="sp"></span><small>出厂默认值 · 可按区域调整</small></div>' +
     '<table class="tb"><thead><tr><th>编号</th><th>条件</th><th>动作</th></tr></thead><tbody>' +
-    [['R1', '热源 ≥ 120℃', 'cut'], ['R2', '≥ 80℃ 且 ≥ 2℃/s', 'warn'], ['R3', '热源 ≥ 50℃ 且无人 · 持续 60 s', 'cut'], ['R4', '无测温 + 可加热器皿 + 无人 + 环境 &gt; 55℃', 'cut'],
-      ['R5', '烟雾 ≥ 1800', 'cut'], ['R6–R8', '高湿 · 环境高温 · 量器受热', 'warn'], ['R9', '预测 ≤ 90 s 干烧 · 沸腾无人 300 s', 'warn']].map(function (r) {
+    [['R1', '台面温度 ≥ 55℃', 'cut'], ['R2', '加热中升温 ≥ 3℃/min', 'warn'], ['R3', '加热中（继电器闭合）且无人 · 持续 60 s', 'cut'],
+      ['R5', '烟雾 ≥ 1800', 'cut'], ['R6–R8', '高湿 · 台面温度偏高 40℃ · 量器受热', 'warn'], ['R9', '预测 ≤ 90 s 到达断电线', 'warn']].map(function (r) {
       return '<tr><td class="num">' + r[0] + '</td><td>' + r[1] + '</td><td>' + (r[2] === 'cut' ? '<span class="tag t-high">断电</span>' : '<span class="tag t-mid">警告 / 提醒</span>') + '</td></tr>';
     }).join('') +
-    '<tr class="bad"><td class="num">固件</td><td>热源 ≥ 150℃ · 烟雾 ≥ 2500 · 心跳中断 30 s</td><td><span class="tag t-high">本地断电</span></td></tr></tbody></table></section></div>' +
+    '<tr class="bad"><td class="num">固件</td><td>台面温度 ≥ 70℃ · 烟雾 ≥ 2500 · 继电器闭合时心跳中断 30 s</td><td><span class="tag t-high">本地断电</span></td></tr></tbody></table></section></div>' +
     '<div class="cols"><section class="panel" aria-label="分层上报规则" style="flex:1 1 100%"><div class="ph dk">' + icon('building') + '分层上报 · 学生端 / 实验室 / 实验楼<span class="sp"></span><small>同一次判断，三层等级各自计算</small></div>' +
     '<table class="tb"><thead><tr><th>层级</th><th>计入的风险</th><th>呈现方式</th><th>低 / 中 / 高</th></tr></thead><tbody>' +
     [['学生端', '全部风险因子（含饮食、防护、伏案、桌边等行为）', '语音台词 · 待处理事项 · 信号灯', '温和提醒 / 温和提醒 / 严厉干预'],

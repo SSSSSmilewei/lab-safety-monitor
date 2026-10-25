@@ -3,10 +3,10 @@
  * firmware/lab_guard_esp32/lab_guard_esp32.ino
  *
  * 职责：
- *   1. 采集 SHT30（环境温湿度）、MLX90614（热源表面温度）、MQ-2（烟雾）
+ *   1. 采集 SHT30（台面温湿度，放在加热器旁 5～10 cm）、MQ-2（烟雾）。红外测温 MLX90614 已删除
  *   2. 通过 USB 串口向香橙派上报遥测，执行上位机的断电 / 语音指令
- *   3. 本地硬规则（不依赖上位机）：热源超温、烟雾超标 → 立即断电
- *   4. 看门狗：上位机心跳丢失 30 秒且仍在加热 → 断电兜底
+ *   3. 本地硬规则（不依赖上位机）：台面超温、烟雾超标 → 立即断电
+ *   4. 看门狗：继电器闭合（正在加热）时上位机心跳丢失 30 秒 → 断电兜底
  *   5. 断电后锁定：只有现场长按复位键才能恢复供电（上位机只能断电，不能上电）；
  *      同一个键在通电时长按 2 秒 = 现场断电（急停），已断电时长按 2 秒 = 复位上电
  *   6. 外部温湿度控制：排风扇（PWM 调速）+ 加湿雾化片，控制律在本地执行，断网也能工作；
@@ -15,7 +15,6 @@
  *
  * 依赖库（Arduino 库管理器搜索安装）：
  *   - Adafruit SHT31 Library（兼容 SHT30）
- *   - Adafruit MLX90614 Library
  *   - DFRobotDFPlayerMini
  * 开发板：esp32 by Espressif（2.x 或 3.x），板型选 "ESP32S3 Dev Module"
  *   - 用板子上标 "UART/COM" 的口连接香橙派：USB CDC On Boot = Disabled
@@ -30,7 +29,6 @@
  */
 #include <Wire.h>
 #include <Adafruit_SHT31.h>
-#include <Adafruit_MLX90614.h>
 #include <DFRobotDFPlayerMini.h>
 
 // ------------------------------- 引脚 -------------------------------
@@ -53,16 +51,15 @@ const bool BUZZER_ACTIVE_HIGH = false; // 本队蜂鸣器模块 MH-FMD 为低电
 const bool BTN_ACTIVE_HIGH   = true;   // 本队 3 针按键模块：按下输出高电平、松开输出低电平；裸按键（按下接地）改为 false
 
 // ------------------------------- 阈值 -------------------------------
-const float    HARD_LIMIT_C     = 150.0;  // 本地硬上限，高于上位机的干烧阈值（120℃），作为最后防线
+const float    HARD_LIMIT_C     = 70.0;   // 台面温度本地硬上限，高于上位机的超温断电阈值（55℃），作为最后防线
 const uint16_t SMOKE_LIMIT_RAW  = 2500;   // 本地烟雾硬上限（上位机预警阈值更低）
-// 复位门槛：与上位机 rules.dry_burn_c / rules.smoke_raw 的默认值一致。
+// 复位门槛：台面温度低于上位机超温断电阈值（55℃）一些，烟雾与 rules.smoke_raw 默认值一致。
 // 高于它们时拒绝复位，否则会先通电、上位机随即又断电，继电器来回开关
-const float    RESET_MAX_C      = 120.0;
+const float    RESET_MAX_C      = 50.0;
 const uint16_t RESET_SMOKE_MAX  = 1800;
 const uint32_t MQ2_WARMUP_MS    = 60000;  // MQ-2 上电预热时间
 const uint32_t HB_LOST_MS       = 5000;   // 超过该时间无心跳 → 黄灯闪烁提示失联
-const uint32_t WATCHDOG_CUT_MS  = 30000;  // 失联超过该时间且仍在加热 → 断电
-const float    WATCHDOG_HOT_C   = 60.0;
+const uint32_t WATCHDOG_CUT_MS  = 30000;  // 继电器闭合时失联超过该时间 → 断电
 const uint32_t SENSOR_PERIOD_MS = 500;
 const uint32_t BTN_LONG_MS      = 2000;   // 长按 2 秒：通电中 = 现场断电并锁定；已断电 = 复位上电（先查温度和烟雾）
 const uint16_t SMOKE_FAN_RAW    = 1200;   // 烟雾达到该值：排风满速、禁止加湿
@@ -81,11 +78,10 @@ enum { EV_LOCAL_OVERTEMP = 1, EV_LOCAL_SMOKE = 2, EV_WATCHDOG = 3, EV_PC_CUT = 4
        EV_RESET_OK = 5, EV_RESET_REFUSED = 6, EV_BOOT = 7, EV_BUTTON_CUT = 8 };
 
 Adafruit_SHT31 sht;
-Adafruit_MLX90614 mlx;
 DFRobotDFPlayerMini df;
-bool shtOk = false, mlxOk = false, dfOk = false;
+bool shtOk = false, dfOk = false;
 
-float tempC = NAN, humi = NAN, objC = NAN;
+float tempC = NAN, humi = NAN;
 uint16_t smokeRaw = 0;
 bool relayOn = false, latched = false;
 uint8_t cutReason = CUT_NONE;
@@ -158,14 +154,14 @@ void setRelay(bool on) {
 bool smokeReady() { return millis() > MQ2_WARMUP_MS; }
 
 bool localHazard() {
-  bool hot = mlxOk && !isnan(objC) && objC >= HARD_LIMIT_C;
+  bool hot = shtOk && !isnan(tempC) && tempC >= HARD_LIMIT_C;
   bool smoke = smokeReady() && smokeRaw >= SMOKE_LIMIT_RAW;
   return hot || smoke;
 }
 
 bool resetBlocked() {
   if (localHazard()) return true;
-  bool hot = mlxOk && !isnan(objC) && objC >= RESET_MAX_C;
+  bool hot = shtOk && !isnan(tempC) && tempC >= RESET_MAX_C;
   bool smoke = smokeReady() && smokeRaw >= RESET_SMOKE_MAX;
   return hot || smoke;
 }
@@ -176,7 +172,7 @@ void cutPower(uint8_t reason, uint8_t eventCode) {
   latched = true;
   cutReason = reason;
   if (first) {
-    sendEvent(eventCode, isnan(objC) ? 0 : (int16_t)(objC * 10));
+    sendEvent(eventCode, isnan(tempC) ? 0 : (int16_t)(tempC * 10));
     beep(3, 120);
   }
 }
@@ -241,28 +237,22 @@ void readSensors() {
   } else {
     shtOk = sht.begin(0x44);
   }
-  if (mlxOk) {
-    objC = mlx.readObjectTempC();
-    if (isnan(objC) || objC < -70 || objC > 380) { objC = NAN; mlxOk = mlx.begin(); }
-  } else {
-    mlxOk = mlx.begin();
-  }
   smokeRaw = analogRead(PIN_MQ2);
 }
 
 void evaluateLocalRules() {
-  if (mlxOk && !isnan(objC) && objC >= HARD_LIMIT_C) cutPower(CUT_OVERTEMP, EV_LOCAL_OVERTEMP);
+  if (shtOk && !isnan(tempC) && tempC >= HARD_LIMIT_C) cutPower(CUT_OVERTEMP, EV_LOCAL_OVERTEMP);
   if (smokeReady() && smokeRaw >= SMOKE_LIMIT_RAW)   cutPower(CUT_SMOKE, EV_LOCAL_SMOKE);
-  bool hot = !mlxOk || isnan(objC) || objC > WATCHDOG_HOT_C;   // 测不到温度时按"可能很热"保守处理
-  if (relayOn && millis() - lastHb > WATCHDOG_CUT_MS && hot) cutPower(CUT_WATCHDOG, EV_WATCHDOG);
+  // 继电器闭合 = 加热片有电；上位机失联就断电，不再看温度（台面温度反映不了容器是否烧干）
+  if (relayOn && millis() - lastHb > WATCHDOG_CUT_MS) cutPower(CUT_WATCHDOG, EV_WATCHDOG);
 }
 
 void sendTelemetry() {
   int16_t t  = (shtOk && !isnan(tempC)) ? (int16_t)(tempC * 10) : INVALID_I16;
   uint16_t h = (shtOk && !isnan(humi)) ? (uint16_t)(humi * 10) : INVALID_U16;
-  int16_t o  = (mlxOk && !isnan(objC)) ? (int16_t)(objC * 10) : INVALID_I16;
+  int16_t o  = INVALID_I16;   // 保留字段（原红外热源温度），协议不变，固定发无效值
   uint8_t flags = (relayOn << 0) | (latched << 1) | ((millis() - lastHb < HB_LOST_MS) << 2)
-                | (shtOk << 3) | (mlxOk << 4) | (smokeReady() << 5) | (localHazard() << 6);
+                | (shtOk << 3) | (smokeReady() << 5) | (localHazard() << 6);   // bit4 保留为 0
   uint8_t p[10];
   memcpy(p + 0, &t, 2); memcpy(p + 2, &h, 2); memcpy(p + 4, &o, 2); memcpy(p + 6, &smokeRaw, 2);
   p[8] = flags; p[9] = cutReason;
@@ -275,6 +265,8 @@ bool manualActive() { return manualUntil != 0 && (int32_t)(manualUntil - millis(
 void envControl() {
   bool smoke = smokeReady() && smokeRaw >= SMOKE_FAN_RAW;
   if (smoke) {                           // 烟雾优先：满速排风、禁止加湿（手动指令也不例外）
+    fanPwm = 100; humidOn = false;
+  } else if (latched && cutReason == CUT_BUTTON) {   // 现场长按 2 秒断电（急停）：满速排风直到复位
     fanPwm = 100; humidOn = false;
   } else if (!manualActive()) {
     manualUntil = 0;
@@ -359,7 +351,6 @@ void setup() {
   Serial.begin(115200);
   Wire.begin(PIN_SDA, PIN_SCL);
   shtOk = sht.begin(0x44);
-  mlxOk = mlx.begin();
   Serial1.begin(9600, SERIAL_8N1, PIN_DF_RX, PIN_DF_TX);
   dfOk = df.begin(Serial1);
   if (dfOk) df.volume(25);

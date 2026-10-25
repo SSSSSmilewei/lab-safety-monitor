@@ -7,10 +7,13 @@
   python tools/center_demo.py --images 演示图片目录      # 把目录里的图片设为各实验桌的演示画面
   python tools/center_demo.py --reset                  # 删掉旧的演示数据库，重新生成
   python tools/center_demo.py --live LG-A01            # 这台终端不模拟，留给真实开发板程序接入（实时画面、问答）
+  python tools/center_demo.py --host 0.0.0.0           # 允许局域网里的其他电脑 / 手机访问
+  python tools/center_demo.py --password 123456        # 所有账号统一改成这个密码（只用于演示，跳过密码强度检查）
 
 真实终端接入（--live）：节点密钥写入 runtime/center_demo_live.yaml，开发板程序用它启动即可
   LAB_SAFETY_CONFIG=runtime/center_demo_live.yaml python run_app.py --mode headless
 该文件是完整配置（config.yaml + center 段），串口、摄像头沿用 config.yaml。A 实验室 1 号桌对应 LG-A01。
+文件里的密钥仍有效时沿用（开发板开机自启不用跟着改），否则换新密钥。
 
 演示画面：文件名含 desk / 台面 的图片作为「台面」画面，其余作为「全景」画面，按顺序轮流分给各实验桌；
 也可以登录后在实验桌页面的画面上直接上传。终端拿不到实时画面时显示演示画面，并标明「演示画面」。
@@ -29,27 +32,27 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-# 场景：(工况, 风险等级, 风险分, 热源℃, 依据[(来源, 文字, 分)], 进行中的事件[(等级, 标题)], 锁定)
+# 场景：(工况, 风险等级, 风险分, 台面℃（None = 常温）, 依据[(来源, 文字, 分)], 进行中的事件[(等级, 标题)], 锁定)
 SCENES = {
     "idle": ("无人，台面空闲", "low", 0, 24.0, [], [], False),
-    "safe_heat": ("加热操作中", "low", 0, 86.0, [], [], False),
+    "safe_heat": ("加热操作中", "low", 0, 33.5, [], [], False),
     "bench": ("台面操作中", "mid", 30, None, [("人员 × 器皿", "台面有器皿时未佩戴护目镜", 15), ("人员 × 器皿", "台面有器皿时未佩戴手套", 15)],
               [("NOTICE", "未佩戴护目镜"), ("NOTICE", "未佩戴手套")], False),
-    "cylinder": ("加热操作中", "mid", 65, 63.2, [("器皿 × 传感器", "加热时台面有不可加热量器（measuring cylinder）", 35),
+    "cylinder": ("加热操作中", "mid", 65, 36.2, [("器皿 × 传感器", "加热时台面有不可加热量器（measuring cylinder）", 35),
                                             ("人员 × 传感器", "加热中未佩戴护目镜（飞溅 / 烫伤风险）", 30)],
                  [("NOTICE", "量器被加热"), ("NOTICE", "未佩戴护目镜")], False),
-    "away": ("加热中，人员离岗", "high", 100, 97.8, [("人员 × 传感器", "正在加热但台前无人", 70), ("规则引擎", "存在警告事件", 40)],
+    "away": ("加热中，人员离岗", "high", 100, 38.6, [("人员 × 传感器", "正在加热但台前无人", 70), ("规则引擎", "存在警告事件", 40)],
              [("WARNING", "加热无人值守")], False),
-    "latched": ("断电锁定中", "high", 100, 131.5, [("规则引擎", "断电锁定中：已发生过高危情况", 100)],
-                [("CRITICAL", "干烧")], True),
-    "oil": ("加热操作中", "low", 8, 186.0, [("人员模型", "未佩戴口罩", 8)], [], False),
+    "latched": ("断电锁定中", "high", 100, 58.2, [("规则引擎", "断电锁定中：已发生过高危情况", 100)],
+                [("CRITICAL", "台面温度超限")], True),
+    "oil": ("加热操作中", "low", 8, 44.0, [("人员模型", "未佩戴口罩", 8)], [], False),
     # 分层上报示例：摘防护吃东西 —— 学生端高危（严厉干预），实验室只记知会，实验楼不打扰
     "apple": ("台面操作中（未加热）", "high", 89, None, [("规则引擎", "存在警告事件", 40), ("人员模型", "实验区饮食", 25),
               ("人员模型", "未佩戴护目镜", 8), ("人员模型", "未佩戴口罩", 8), ("人员模型", "未佩戴头罩", 8)],
               [("WARNING", "实验区饮食"), ("NOTICE", "未佩戴护目镜"), ("NOTICE", "未佩戴口罩")], False),
 }
 # 属于安全规则的事件（其余是行为事件）：决定实验室 / 实验楼两层是否计入
-HAZARD_TITLES = {"量器被加热", "加热无人值守", "干烧"}
+HAZARD_TITLES = {"量器被加热", "加热无人值守", "台面温度超限"}
 
 
 def _cross_check():
@@ -77,18 +80,20 @@ def snapshot(scene: str, t: float):
     return {
         "state": "CRITICAL" if latched or lv == "high" else "WARNING" if lv == "mid" else "NORMAL",
         "state_text": "断电锁定中" if latched else {"high": "危险", "mid": "注意", "low": "正常"}[lv],
-        "latched": latched, "latch_reason": "热源 131℃ 超过干烧阈值 120℃" if latched else "",
-        "telemetry": {"temp": round(24.5 + wobble, 1), "humi": round(52 + wobble * 3), "obj_temp": None if temp is None else round(temp + wobble * 2, 1),
+        "latched": latched, "latch_reason": "台面温度 58℃ 超过断电线 55℃" if latched else "",
+        "telemetry": {"temp": round((24.5 if temp is None else temp) + wobble, 1), "humi": round(52 + wobble * 3),
                       "smoke": 210 + int(wobble * 20), "source": "demo"},
         "link": {"mcu": True, "relay_on": not latched},
         "vision": {"ok": True, "person_present": present, "fps": "9.8 FPS",
                    "ppe": [{"kind": k, "name": n, "status": ("bad" if k in missing else "ok") if present else "unknown"} for k, n in PPE]},
-        "world_model": {"phase_text": "升温中" if temp and temp < 100 else "高温", "temp": temp, "eta_boil_s": 240 if scene == "cylinder" else None, "eta_s": None},
+        "world_model": {"phase_text": "升温中" if temp and temp < 55 else ("已超断电线" if temp else "常温"), "temp": temp,
+                        "phase": "heating" if temp and temp < 55 else ("overheat" if temp else "idle"),
+                        "slope_per_min": 0.8 if temp and temp < 55 else 0.0, "eta_s": 600 if scene == "cylinder" else None},
         "risk": risk,
         "active_events": [{"level": l, "title": ti, "message": "", "time_str": time.strftime("%H:%M:%S", time.localtime(t - 40 * i))}
                           for i, (l, ti) in enumerate(evs)],
         "stats": {"reviewed": 12, "correct": 11},
-        "rules": {"dry_burn_c": 120, "smoke_raw": 1800},
+        "rules": {"overtemp_cut_c": 55, "rate_c_per_min": 3.0, "smoke_raw": 1800},
         "mute_until": 0,
     }
 
@@ -168,13 +173,39 @@ def load_images(st, folder: str) -> int:
     return count
 
 
+LIVE_CONFIG = os.path.join(ROOT, "runtime", "center_demo_live.yaml")
+
+
+def live_token(st, node) -> str:
+    """沿用 center_demo_live.yaml 里仍对得上这台终端的密钥，否则换新"""
+    try:
+        import yaml
+        with open(LIVE_CONFIG, encoding="utf-8") as f:
+            tok = str(((yaml.safe_load(f) or {}).get("center") or {}).get("node_token") or "")
+        hit = st.node_by_token(tok) if tok else None
+        if hit and hit["id"] == node["id"]:
+            return tok
+    except (OSError, ValueError):
+        pass
+    return st.rotate_node_token(node["id"])
+
+
+def set_demo_password(st, password: str):
+    """演示用：所有账号改成同一个密码，跳过强度检查，不要求首次修改"""
+    from center.store import _hash_pw
+    import secrets
+    for u in st.users():
+        salt = secrets.token_hex(16)
+        st._x("UPDATE users SET pw_hash=?, salt=?, must_change=0 WHERE id=?", (_hash_pw(password, salt), salt, u["id"]))
+
+
 def write_live_config(name: str, token: str, port: int):
     """给真实开发板程序写一份配置：config.yaml 全部内容 + 指向本演示总后台的 center 段（runtime/config_override.yaml 照常叠加）"""
     import yaml
     with open(os.path.join(ROOT, "config.yaml"), encoding="utf-8") as f:
         conf = yaml.safe_load(f) or {}
     conf["center"] = {**conf.get("center", {}), "url": f"http://127.0.0.1:{port}", "node_token": token}
-    path = os.path.join(ROOT, "runtime", "center_demo_live.yaml")
+    path = LIVE_CONFIG
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(f"# center_demo.py --live {name} 自动生成；每次启动演示都会换新密钥\n")
@@ -185,6 +216,8 @@ def write_live_config(name: str, token: str, port: int):
 def main():
     ap = argparse.ArgumentParser(description="总后台演示数据")
     ap.add_argument("--port", type=int, default=8210)
+    ap.add_argument("--host", default="127.0.0.1", help="监听地址；0.0.0.0 允许局域网访问")
+    ap.add_argument("--password", default="", help="所有账号统一改成这个密码（演示用）")
     ap.add_argument("--db", default=os.path.join(ROOT, "runtime", "center_demo.db"))
     ap.add_argument("--images", default="", help="演示画面图片目录")
     ap.add_argument("--reset", action="store_true", help="删除旧的演示数据库后重新生成")
@@ -215,7 +248,9 @@ def main():
         if node is None:
             print(f"[演示] 没有名为 {name} 的终端，可选：{', '.join(sorted(PLAN))}")
             return
-        write_live_config(name, st.rotate_node_token(node["id"]), args.port)
+        write_live_config(name, live_token(st, node), args.port)
+    if args.password:
+        set_demo_password(st, args.password)
 
     def report_loop():
         c = TestClient(app)
@@ -230,9 +265,12 @@ def main():
 
     threading.Thread(target=report_loop, daemon=True).start()
     print(f"[演示] 数据库 {args.db}")
-    print(f"[演示] 打开 http://127.0.0.1:{args.port}  ·  demo / Demo2026show  ·  admin / Demo2026admin  ·  "
-          f"zhang_t / Demo2026teach  ·  li_t / Demo2026teach  ·  pixel / Demo2026pixel")
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+    if args.password:
+        print(f"[演示] 打开 http://127.0.0.1:{args.port}  ·  账号 {' / '.join(u['username'] for u in st.users())}，密码均为 {args.password}")
+    else:
+        print(f"[演示] 打开 http://127.0.0.1:{args.port}  ·  demo / Demo2026show  ·  admin / Demo2026admin  ·  "
+              f"zhang_t / Demo2026teach  ·  li_t / Demo2026teach  ·  pixel / Demo2026pixel")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":

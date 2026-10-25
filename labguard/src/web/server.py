@@ -153,7 +153,7 @@ def create_app(engine) -> FastAPI:
         return {"files": [os.path.basename(f) for f in sorted(files)], "current": engine.media_label}
 
     # ---------------- MJPEG 画面 ----------------
-    @app.get("/stream/{which}.mjpg", dependencies=[Depends(auth)])
+    @app.get("/stream/{which}.mjpg", dependencies=[Depends(auth_or_center)])
     async def stream(which: str):
         if which not in ("pano", "desk"):
             raise HTTPException(404)
@@ -200,7 +200,7 @@ def create_app(engine) -> FastAPI:
     @app.patch("/api/config", dependencies=[Depends(auth)])
     async def patch_config(request: Request):
         data = await body(request)
-        changed, errors = validate_tunable(data, {k: cfg(k) for k in ("rules.dry_burn_c", "rules.heating_on_c", "cross.mid_score", "cross.high_score")})
+        changed, errors = validate_tunable(data, {k: cfg(k) for k in ("rules.overtemp_cut_c", "rules.ambient_high_c", "cross.mid_score", "cross.high_score")})
         if errors:
             raise HTTPException(422, {"errors": errors})
         for k, v in changed.items():

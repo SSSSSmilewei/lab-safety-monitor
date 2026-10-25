@@ -22,7 +22,7 @@ from src.config import cfg, set_value
 from src.core.events import events
 from src.core.tunable import tunable_spec, validate, label
 
-TRIM_WM = ("phase", "phase_text", "temp", "slope", "eta_s", "eta_boil_s", "plateau_s", "risk")
+TRIM_WM = ("phase", "phase_text", "temp", "slope", "slope_per_min", "eta_s", "eta_warn_s", "risk")
 RULE_PREFIXES = ("rules.", "presence.", "voting.", "events.", "vision.", "cross.")
 
 
@@ -81,7 +81,7 @@ class CenterLink:
             "meta": {
                 "web_port": local_web_port(),
                 "hostname": socket.gethostname(),
-                "hard_limit_c": float(cfg("hardware.hard_limit_c", 150.0)),
+                "hard_limit_c": float(cfg("hardware.hard_limit_c", 70.0)),
                 "smoke_limit_raw": int(cfg("hardware.smoke_limit_raw", 2500)),
                 "profile_version": self.profile_version,
                 "applied_profile": self.applied,
@@ -115,7 +115,7 @@ class CenterLink:
         if not version or version == self.profile_version:
             return
         rules = prof.get("rules") or {}
-        cur = {k: cfg(k) for k in ("rules.dry_burn_c", "rules.heating_on_c", "cross.mid_score", "cross.high_score")}
+        cur = {k: cfg(k) for k in ("rules.overtemp_cut_c", "rules.ambient_high_c", "cross.mid_score", "cross.high_score")}
         rule_part = {k: v for k, v in rules.items() if k.startswith(RULE_PREFIXES)}
         ok, errors = validate(rule_part, cur, tunable_spec())
         changed = {k: v for k, v in ok.items() if cfg(k) != v}

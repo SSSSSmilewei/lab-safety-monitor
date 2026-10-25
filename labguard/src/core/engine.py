@@ -160,7 +160,7 @@ class SafetyEngine(QObject):
                 "eating": events.is_active("eating"), "sleeping": events.is_active("sleeping"),
                 "edge_risk": events.is_active("edge_risk"),
                 "chem_items": list(a.get("chem_items", [])) if a else [],
-                "obj_temp": telemetry.get("obj_temp"), "heating": sm.heating,
+                "heating": sm.heating,
                 "wm_phase": wm.get("phase"), "wm_risk": wm.get("risk"), "wm_eta_s": wm.get("eta_s"),
                 "latched": sm.latched,
                 "event_levels": [e.get("level") for e in active],
@@ -294,9 +294,10 @@ class SafetyEngine(QObject):
             "state_text": "断电锁定中" if sm.latched else STATE_TEXT.get(sm.current_state, sm.current_state),
             "latched": sm.latched,
             "latch_reason": sm.latch_reason,
+            "heating": sm.heating,   # 接控制盒时 = 继电器闭合；演示时 = 台面温度达到加热阈值
             "power_off_state": getattr(link, "power_off_state", "idle") if link else "idle",
             "telemetry": {
-                "temp": tel.get("temp"), "humi": tel.get("humi"), "obj_temp": tel.get("obj_temp"),
+                "temp": tel.get("temp"), "humi": tel.get("humi"),
                 "smoke": tel.get("smoke"), "source": tel.get("source"),
             },
             "link": {
@@ -321,7 +322,7 @@ class SafetyEngine(QObject):
             "stats": events.stats(),
             "call": self.last_call,
             "mute_until": self._mute_until if self._mute_until > time.time() else 0,
-            "rules": {k: cfg(f"rules.{k}") for k in ("dry_burn_c", "heating_on_c", "unattended_heating_cut_s",
+            "rules": {k: cfg(f"rules.{k}") for k in ("overtemp_cut_c", "heating_on_c", "rate_c_per_min", "unattended_heating_cut_s",
                                                        "smoke_raw", "humidity_high", "ambient_high_c",
                                                        "predict_eta_warn_s")},
         }

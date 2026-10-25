@@ -80,7 +80,7 @@
 
       function nodesHtml() {
         if (!nodes.length) return '<div class="empty">尚未登记终端</div>';
-        return '<div class="tbwrap"><table class="tb" style="min-width:760px"><thead><tr><th>终端</th><th>绑定实验桌</th><th>状态</th><th>最近上报</th><th>地址</th><th>热源 / 烟雾硬上限</th><th>上报次数</th><th><span class="sr">操作</span></th></tr></thead><tbody>' +
+        return '<div class="tbwrap"><table class="tb" style="min-width:760px"><thead><tr><th>终端</th><th>绑定实验桌</th><th>状态</th><th>最近上报</th><th>地址</th><th>台面温度 / 烟雾硬上限</th><th>上报次数</th><th><span class="sr">操作</span></th></tr></thead><tbody>' +
           nodes.map(function (n) {
             return '<tr><td style="font-weight:600">' + esc(n.name) + '<div class="mut num" style="font-size:12px;font-weight:normal">…' + esc(n.token_hint) + '</div></td><td>' + esc(n.path) + '</td>' +
               '<td><span class="tag ' + (n.online ? 't-low' : 't-off') + '">' + (n.online ? '在线' : '离线') + '</span></td><td class="num">' + LG.ago(n.last_seen) + '</td>' +

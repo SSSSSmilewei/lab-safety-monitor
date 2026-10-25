@@ -477,9 +477,13 @@ class DualInferenceSystem:
             return None
 
         cap = try_open(src)
-        if cap is None and isinstance(src, int):
+        # 指定的设备打不开时扫描其他采集设备：整数索引，或 /dev/... 路径（摄像头换了 USB 口后 by-path 路径会变）
+        if cap is None and (isinstance(src, int) or (isinstance(src, str) and src.startswith("/dev/"))):
+            if isinstance(src, str):
+                print(f"[DualInference] 摄像头 {src} 打不开，自动查找其他摄像头")
+            skip = {os.path.realpath(e) if isinstance(e, str) else e for e in exclude}
             for cand in self._scan_candidates():
-                if cand == src or cand in exclude:
+                if cand == src or cand in exclude or os.path.realpath(cand) in skip:
                     continue
                 cap = try_open(cand)
                 if cap is not None:
@@ -539,10 +543,18 @@ class DualInferenceSystem:
             release(cap2)
             self._scanned_device = None
             cap1, static1, fps1 = self._open_source(cur1)
+            used1 = self._scanned_device if self._scanned_device is not None else cur1
             if shared_live():
                 cap2, static2 = None, None
             else:
-                exclude = (self._scanned_device,) if self._scanned_device is not None else ()
+                # 第二路自动查找时跳过第一路正在用的摄像头（同一个摄像头的两个 /dev/video 节点按编号相邻）
+                exclude = ()
+                if isinstance(used1, str) and used1.startswith("/dev/"):
+                    real = os.path.realpath(used1)
+                    num = "".join(ch for ch in real if ch.isdigit())
+                    exclude = (real,) + ((f"/dev/video{int(num) + 1}",) if num else ())
+                elif used1 is not None:
+                    exclude = (used1,)
                 cap2, static2, _ = self._open_source(cur2, exclude)
 
         while self.running:
@@ -860,9 +872,9 @@ class DualInferenceSystem:
             pass
         snap = telemetry.snapshot()
         src_text = {"hardware": "实测", "ipc": "模拟器注入", "simulated": "自主模拟"}.get(snap.get("source"), "无")
-        obj = snap.get("obj_temp")
+        temp = snap.get("temp")
         parts.append(f"遥测: {src_text}")
-        parts.append(f"热源: {obj:.1f}℃" if obj is not None else "热源测温: 未接入")
+        parts.append(f"台面温度: {temp:.1f}℃" if temp is not None else "台面温度: 无数据")
         if snap.get("smoke") is not None:
             parts.append(f"烟雾: {snap['smoke']}")
         return "[系统] " + " | ".join(parts)

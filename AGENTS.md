@@ -6,14 +6,14 @@
 
 ## 1. 项目一句话
 
-化学实验室安全监测终端（第 22 届计算机设计大赛·嵌入式赛道，湖南涉外经济学院 3 队）。两个 USB 摄像头 + YOLO11 识别人员装备和台面器皿；ESP32 下位机采集温湿度 / 红外测温 / 烟雾并控制加热继电器；开发板（视美泰 AIOT-3588A，RK3588，Python）把识别结果和传感器数据交给规则判断，危险时让下位机断电。另有实验台小屏、网页大屏、安全助手（大模型）、温度预测、外部温湿度控制，以及可选的 V-JEPA 2 画面异常检测。
+化学实验室安全监测终端（第 22 届计算机设计大赛·嵌入式赛道，湖南涉外经济学院 3 队）。两个 USB 摄像头 + YOLO11 识别人员装备和台面器皿；ESP32 下位机采集台面温湿度（SHT30，放在加热器旁 5～10 cm，是唯一的温度来源；红外测温 MLX90614 已于 2026-10-24 删除）/ 烟雾并控制加热继电器；开发板（视美泰 AIOT-3588A，RK3588，Python）把识别结果和传感器数据交给规则判断，危险时让下位机断电。另有实验台小屏、网页大屏、安全助手（大模型）、温度预测、外部温湿度控制，以及可选的 V-JEPA 2 画面异常检测。
 
 ## 2. 不可违反的设计约束（改代码前必读）
 
 1. **软件只能断电，不能通电。** 代码里不存在任何"通电 / 解锁继电器"的接口；恢复供电只能现场长按控制盒控制键 2 秒（复位），下位机复查温度和烟雾后才通电。`tests/test_platform.py` 会检查网页路由里没有 power/on、unlock、reset、release 之类的接口。
 2. **大模型不碰电闸。** 安全助手（`src/agent/`）的工具全部只读（`TOOLS` 里只有 get_status / get_recent_events / get_forecast / search_manual），测试会检查工具名里没有 power / relay / reset / unlock / cut。V-JEPA 2 和温度预测也只产生提醒，不参与断电。
 3. **安全判断不依赖任何界面。** 判断在 `src/core/engine.py` 的 `SafetyEngine` 里完成；小屏、电脑大窗口、网页大屏都只是显示和操作入口。不要把判断逻辑写回界面里。
-4. **下位机本地硬规则独立于开发板**：热源 ≥150℃、烟雾 ≥2500、30 秒收不到心跳且仍在加热 → 断电；上电时继电器默认断开。这些阈值写在固件里，网页上改不了；`config.yaml → hardware` 要和烧进固件的值一致，网页上的断电阈值只能设在它以下。现场复位时热源 ≥120℃ 或烟雾 ≥1800（与开发板默认断电阈值一致）会被拒绝。
+4. **下位机本地硬规则独立于开发板**：台面温度 ≥70℃、烟雾 ≥2500、继电器闭合时 30 秒收不到心跳 → 断电；上电时继电器默认断开。这些阈值写在固件里，网页上改不了；`config.yaml → hardware` 要和烧进固件的值一致，网页上的断电阈值只能设在它以下。现场复位时台面温度 ≥50℃ 或烟雾 ≥1800 会被拒绝。
 5. **心跳由安全判断驱动**：`SafetyStateMachine.evaluate()` 每次跑完调用 `SerialComm.feed()`，超过 `serial.engine_stale_s`（5 秒）没被调用就停发心跳，让下位机看门狗接管。不要在别处定时发心跳。
 6. **演示数据不能和真实数据混用**：接上下位机后 `/api/demo/start` 和播放演示视频都返回 409，正在播放的演示视频会自动切回摄像头。
 7. **API Key 只放环境变量**（默认 `DASHSCOPE_API_KEY`），网页上填的 Key 只存在内存里，不写文件、不回显。不要把 Key 写进 `config.yaml` 或提交到仓库。开发板开机自启读不到 `~/.bashrc`，`start.sh` 会加载仓库外的 `~/.config/labguard/env`（每行 `KEY=值`，chmod 600）。没有 Key 也没有本地模型时，安全助手只能用规则模板（回答末尾标「规则模板（离线兜底）」）。
@@ -36,14 +36,14 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 |---|---|
 | `run_center.py` / `center/` | **总后台**（多实验室管理中心，独立程序，默认端口 8200）：`app.py` 接口、`store.py`（SQLite：账号、会话、区域树、授权、终端、阈值方案、指令队列、语音、审计）、`presets.py` 阈值预设、`voice.py` 语音素材；前端 `center/static/`（`core.js` 框架 + `views/*.js` 各页，原生 JS 无构建）。见第 8 节末 |
 | `run_app.py` (76) | 唯一入口。`--mode desktop`（默认：电脑大窗口 + 网页）/ `edge`（开发板：小屏全屏 + 网页）/ `headless`（只有网页）；`--no-web`；`--windowed`（小屏以窗口显示，调试用） |
-| `config.yaml` (147) / `src/config.py` (191) | 所有阈值和设置。`cfg("rules.dry_burn_c")` 读取；`set_value()` 运行时修改并写入 `runtime/config_override.yaml`（覆盖 config.yaml 同名项）；环境变量 `LAB_SAFETY_CONFIG` 可指定其他配置文件 |
+| `config.yaml` (147) / `src/config.py` (191) | 所有阈值和设置。`cfg("rules.overtemp_cut_c")` 读取；`set_value()` 运行时修改并写入 `runtime/config_override.yaml`（覆盖 config.yaml 同名项）；环境变量 `LAB_SAFETY_CONFIG` 可指定其他配置文件 |
 | `src/core/engine.py` (295) | **安全核心**。`SafetyEngine(QObject)`：持有识别线程、传感器线程、状态机、串口；每帧 / 每次遥测 / 每秒调用 `state_machine.evaluate()`；`snapshot()` 输出给所有界面的 JSON 状态；`cut_power()`、`mute()`、`call_admin()`；`attach_extensions()` 挂载 env / demo / jepa / agent |
 | `src/core/state_machine.py` (437) | 规则 R1–R9、断电与锁定、现场复位同步、`manual_power_off()` |
-| `src/core/world_model.py` (207) | 温度预测 `ThermalWorldModel`（见第 6 节） |
+| `src/core/world_model.py` | 台面温度趋势 `ThermalWorldModel`（见第 6 节） |
 | `src/core/events.py` (381) | 事件中心 `events`（全局单例）：上升沿 / 下降沿、防抖、语音、灯、webhook、SQLite、截图、历史、监听者、复核与处理建议写回 |
-| `src/core/telemetry.py` (46) | 全局遥测快照 `telemetry`（环境温湿度、热源温度、烟雾、来源） |
+| `src/core/telemetry.py` (46) | 全局遥测快照 `telemetry`（台面温湿度、烟雾、来源） |
 | `src/core/env_control.py` (142) | 排风扇 / 加湿片：`control_law()` 纯函数 + `EnvController` |
-| `src/core/demo.py` (105) | 演示数据注入 `DemoInjector`（场景：normal / heating / dry_burn / smoke / humid / dry_air / hot / custom） |
+| `src/core/demo.py` (105) | 演示数据注入 `DemoInjector`（场景：normal / heating / overtemp / smoke / humid / dry_air / hot / custom） |
 | `src/core/jepa_link.py` (48) | 接收电脑端 V-JEPA 2 上报的异常度 |
 | `src/core/cross_check.py` | 交叉验证：人员 × 器皿 × 传感器 → 工况、风险分、低 / 中 / 高三级与依据，驱动信号灯；不参与断电。分界 `cross.mid_score` / `cross.high_score`（默认 30 / 70）可按区域调整。`tiers()` 做**分层上报**：同一次判断给出学生端 / 实验室老师 / 实验楼三层各自的等级（见第 5 节末） |
 | `src/core/center_link.py` | 开发板接入总后台：定时上报快照，取回区域阈值（按本机硬上限再校验）、断电 / 静音指令、语音包 |
@@ -53,7 +53,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `src/agent/llm_client.py` (173) | OpenAI 兼容客户端，线路 `agent.route`：auto（远程→本地）/ remote / local / off；只用标准库 urllib |
 | `src/agent/rag.py` (76) | 安全手册检索：`knowledge/*.md` 按"## 标题"切条，中文二元组 + BM25 |
 | `src/web/server.py` (433) + `src/web/static/` | 网页大屏（FastAPI + 原生 JS，无构建、无 CDN）。口令鉴权；接口见第 8 节 |
-| `src/ui/kiosk.py` | 实验台小屏（PyQt/PySide，800×480 为基准自适应）。面向同学：状态页左「待处理事项」（交叉验证依据的 `action`）、中热源、右防护与环境；顶栏「地址」页列出本机控制台网址 + 口令和总后台地址（`center.url`）与连接状态。`ui.style`：pixel（默认，Zpix 像素风格）/ standard（新版） |
+| `src/ui/kiosk.py` | 实验台小屏（PyQt/PySide，800×480 为基准自适应）。面向同学：状态页左「待处理事项」（交叉验证依据的 `action`）、中台面温度计（`Thermo` + 曲线）、右防护与湿度 / 烟雾；顶栏「地址」页列出本机控制台网址 + 口令和总后台地址（`center.url`）与连接状态。`ui.style`：standard（默认，新版）/ pixel（旧版 Zpix 像素风格） |
 | `src/ui/main_window.py` (1590) | 电脑大窗口（项目最早的完整界面）；设计令牌类 `T`、`Card`、`Chip`、`load_pixel_font()` 被小屏复用 |
 | `LabSafetyMonitor/dual_inference.py` (849) | 摄像头读取 + 两个 YOLO 模型推理 + 在场判断 + 时间投票 + 伏案 + 桌边线；产出 `alarms` 字典和带框画面 |
 | `LabSafetyMonitor/serial_comm.py` (481) | 下位机串口协议（第 7 节）；单例 `SerialComm.get_shared()` |
@@ -62,7 +62,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh，视美泰 AIOT-3588A 和香橙派 5 通用）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
 | `tools/` | `center_init.py` 总后台正式初始化（一栋楼 / 一间实验室 / 一张实验桌 + 一台终端 + 一个教师账号，无模拟数据，`--local` 把节点密钥写进本机配置）、`center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面、`--live LG-A01` 把一张桌留给真实开发板程序接入，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型（x86 上运行，附模拟器对比）、`check_npu.py` 板子上检查 NPU（版本、加载、速度、和 .pt 对比）、`gen_voice.py` 生成语音文件 |
-| `tests/` | `test_backend.py`（87 项）、`test_platform.py`（44 项）、`test_center.py`（81 项，总后台 + 开发板接入 + 平面图与演示画面 + 分层视角 + 呼叫教师）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
+| `tests/` | `test_backend.py`（98 项）、`test_platform.py`（47 项）、`test_center.py`（81 项，总后台 + 开发板接入 + 平面图与演示画面 + 分层视角 + 呼叫教师）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）、`*_rknn_model/`（导出好的 NPU 模型，FP16，入库）。只有在 Rockchip 板子上才用 RKNN；NPU 加载失败时自动改用 .pt 并记一条事件 |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
 
@@ -70,10 +70,10 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 
 ```
 摄像头 ─→ dual_inference（YOLO×2、投票）─→ alarms{unattended, chem_items, ppe_violation, ...} ─┐
-ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp, humi, obj_temp, smoke}  ───────────┤
+ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp（台面）, humi, smoke}  ───────────────┤
                                                                                                 ↓
                                    SafetyEngine._evaluate() → SafetyStateMachine.evaluate()
-                                     ├→ world_model.update()（温度预测）
+                                     ├→ world_model.update()（台面温度趋势）
                                      ├→ events.update(kind, active, ...)（事件、语音、灯、截图、数据库）
                                      └→ 需要断电：serial.send_power_off() → ESP32 断继电器并回 ACK
                                                                                                 ↓
@@ -83,18 +83,20 @@ ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp, humi, obj_t
 
 ## 5. 安全规则（`state_machine.py`，阈值在 `config.yaml → rules`）
 
+温度都指**台面温度**（SHT30）。"正在加热"：接着下位机时 = 继电器闭合；没接下位机（演示）时 = 台面温度 ≥ `heating_on_c` 35℃。
+
 | 编号 | 条件（默认值） | 结果 |
 |---|---|---|
-| R1 干烧 | 热源 ≥ `dry_burn_c` 120℃ | CRITICAL，断电 |
-| R2 升温异常 | ≥ `rate_min_c` 80℃ 且 ≥ `rate_c_per_s` 2℃/s | WARNING |
-| R3 加热无人 | 热源 ≥ `heating_on_c` 50℃ 且无人；持续 `unattended_heating_cut_s` 60 s | WARNING → CRITICAL 断电 |
-| R4 兜底 | 无热源测温 + 可加热器皿 + 无人 + 环境 > `fallback_ambient_cut_c` 55℃ | CRITICAL，断电 |
+| R1 台面超温 `overtemp` | 台面温度 ≥ `overtemp_cut_c` 55℃ | CRITICAL，断电 |
+| R2 升温过快 `temp_rate` | 加热中且最近 60 s 升温 ≥ `rate_c_per_min` 3℃/min | WARNING |
+| R3 加热无人 | 加热中且无人；持续 `unattended_heating_cut_s` 60 s | WARNING → CRITICAL 断电 |
 | R5 烟雾 | ≥ `smoke_raw` 1800 | CRITICAL，断电 |
 | R6 高湿 | > `humidity_high` 80% | WARNING |
-| R7 环境高温 | > `ambient_high_c` 40℃ | WARNING |
+| R7 台面温度偏高 `ambient_high` | > `ambient_high_c` 40℃ | WARNING |
 | R8 量器被加热 | 加热中且台面有容量瓶 / 量筒等 | NOTICE |
-| R9 预测干烧 | 越过沸点仍升温且预计 ≤ `predict_eta_warn_s` 90 s 到 120℃；或沸腾 ≥ `boil_unattended_warn_s` 300 s 且无人 | WARNING，**不断电** |
+| R9 预测超温 `overtemp_predict` | 趋势预测 ≤ `predict_eta_warn_s` 90 s 后到达断电线 | WARNING，**不断电** |
 
+- R4（旧的"环境温度兜底"）已并入 R1；旧键 `dry_burn_c`、`rate_c_per_s`、`rate_min_c`、`fallback_ambient_cut_c`、`boil_unattended_warn_s` 已删除，`PATCH /api/config` 会拒绝。
 - 器皿靠近桌边（`edge_risk`）：器皿框底边中点离「危险边」小于 `desk.edge_margin`，或已越过危险边。危险边在网页「参数 → 台面安全区」里框选（`desk.zone`），靠墙 / 画面边缘的边标为安全边不报警。
 - 视觉事件（`dual_inference.py`）：`ppe_goggles / ppe_coat / ppe_gloves / ppe_mask / ppe_headmask / eating / sleeping / edge_risk`，经 `voting`（3 秒窗口内 ≥60% 帧命中）确认。
 - 人员在场：PPE 模型检测到任意一类装备即视为有人（模型里没有 person 类）；连续 `presence.absent_seconds` 15 s 无检测才算无人值守。
@@ -115,13 +117,12 @@ ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp, humi, obj_t
 - 群消息（`notify.webhook_url`）默认跳过行为事件（`notify.skip_behavior: true`，`events.BEHAVIOR_KINDS`）。
 - 学生端等级和语音、信号灯的关系不变；分层只影响往上报的部分，不参与断电。
 
-## 6. 温度预测（`world_model.py`）
+## 6. 温度预测（台面温度趋势，`world_model.py`）
 
-- 每秒用最近 60 s 的热源温度拟合一阶热平衡 dT/dt=(T∞−T)/τ（拟合失败退化为线性）。
-- **温度低于沸点（`boil_high_c` 104℃）时只给"多久后沸腾"（`eta_boil_s`），不给干烧 ETA**，预测曲线最多画到沸点——容器里有水时温度会停在 100℃ 附近。
-- 越过沸点仍在升温 = 液体已烧干：改用最近 15 s 线性外推，给出 `eta_s`（到 `dry_burn_c` 的秒数）。
-- 沸腾平台：92–104℃ 且最近 15 s 斜率 < 0.05℃/s，`plateau_s` 累计时长，风险分随时长上升；无人值守时风险 ×1.5。
-- 快照字段：`phase`（no_sensor / idle / warming_up / heating / boiling / steady / cooling / overheat）、`temp`、`slope`、`t_inf`、`tau`、`eta_s`、`eta_boil_s`、`plateau_s`、`risk`、`forecast`（未来 120 s，每 10 s 一个点）、`history`（最近 120 s 实测）。
+- 每秒把台面温度喂给模型，用最近 `world_model.fit_window_s` 60 s 做直线拟合，得到升温速度（`slope` ℃/s、`slope_per_min` ℃/min），按直线外推未来 120 s。
+- `eta_s` = 预计多少秒到断电线 `overtemp_cut_c`；`eta_warn_s` = 到偏高提醒线 `ambient_high_c`；升温速度低于 0.3℃/min 时不预测。
+- 风险分随 ETA 缩短上升，超过提醒线至少 0.5，超断电线为 1；无人值守时 ×1.5。只用于提醒，不参与断电。
+- 快照字段：`phase`（no_sensor / idle / warming_up / warming / heating / steady / cooling / overheat）、`temp`、`slope`、`slope_per_min`、`eta_s`、`eta_warn_s`、`risk`、`forecast`（未来 120 s，每 10 s 一个点）、`history`（最近 120 s 实测）。旧版热源模型的 `eta_boil_s` / `plateau_s` / `t_inf` / `tau` 仍在快照里，恒为空值。
 
 ## 7. 串口协议（`serial_comm.py`，固件与 `tests/fake_mcu.py` 必须一致）
 
@@ -134,12 +135,12 @@ ESP32 ─串口→ serial_comm → sensor_worker → telemetry{temp, humi, obj_t
 | 上→下 | 0x03 PLAY_VOICE | [曲目号]（DFPlayer，`events.voice` 映射，1–13） |
 | 上→下 | 0x04 SET_ENV | `<BhBB` 模式(0 自动/1 手动)、温度设定×10、湿度下限、湿度上限 |
 | 上→下 | 0x05 SET_ACT | [风扇 PWM 0–100, 加湿 0/1]，手动指令 10 分钟有效 |
-| 下→上 | 0x10 TELEMETRY | `<hHhHBB` 温度×10、湿度×10、热源×10、烟雾原始值、flags、断电原因；无效值 0x7FFF / 0xFFFF |
+| 下→上 | 0x10 TELEMETRY | `<hHhHBB` 台面温度×10、湿度×10、保留（原红外热源温度，固定 0x7FFF）、烟雾原始值、flags、断电原因；无效值 0x7FFF / 0xFFFF |
 | 下→上 | 0x11 ACK | [被确认的 SEQ, CMD, 结果] |
-| 下→上 | 0x12 EVENT | `<Bh` 事件码（1 超温断电、2 烟雾断电、3 看门狗断电、4 执行上位机断电、5 复位成功、6 复位被拒、7 启动、8 现场按键断电）+ 数值；断电原因码 5 = 现场按键 |
+| 下→上 | 0x12 EVENT | `<Bh` 事件码（1 台面超温断电、2 烟雾断电、3 看门狗断电（继电器闭合时失联 30 s）、4 执行上位机断电、5 复位成功、6 复位被拒、7 启动、8 现场按键断电）+ 数值；断电原因码 5 = 现场按键 |
 | 下→上 | 0x13 ENV_STATUS | [风扇 PWM, 加湿, 模式] |
 
-flags：bit0 继电器闭合、bit1 锁定、bit2 心跳正常、bit3 SHT30 正常、bit4 MLX90614 正常、bit5 MQ-2 预热完成、bit6 本地危险。
+flags：bit0 继电器闭合、bit1 锁定、bit2 心跳正常、bit3 SHT30 正常、bit4 保留（恒为 0，原 MLX90614）、bit5 MQ-2 预热完成、bit6 本地危险。
 ESP32-S3 引脚：SDA 8、SCL 9、MQ-2 1、继电器 10、LED 红/黄/绿 11/12/13、蜂鸣器 14、控制键 4（长按 2 秒：通电中 = 现场断电并锁定，已断电 = 复位上电）、DFPlayer RX 18 / TX 17、风扇 PWM 15、加湿 16。
 
 ## 8. 开发板本机控制台接口（`src/web/server.py`，端口 `web.port`，本仓库 config.yaml 为 8180）
@@ -168,8 +169,8 @@ conda env create -f environment.yml       # 推荐：Python 3.12，电脑和开�
 pip install -r requirements.txt          # 或者不用 conda：Python 3.10–3.12
 python run_app.py                          # 电脑大窗口 + 网页（网址见启动窗口，本仓库 config.yaml 为 http://127.0.0.1:8180，端口被占用时自动顺延）
 python run_app.py --mode edge --windowed   # 在电脑上看小屏
-python tests/test_backend.py               # 87 项，无需硬件
-python tests/test_platform.py              # 44 项，无需硬件和大模型
+python tests/test_backend.py               # 98 项，无需硬件
+python tests/test_platform.py              # 47 项，无需硬件和大模型
 python tests/test_center.py                # 81 项，总后台：登录、混合授权、终端上报与指令、阈值、界面风格、开发板 CenterLink 真实 HTTP 接入、平面图与演示画面、分层视角、呼叫教师
 python run_center.py                       # 总后台 http://127.0.0.1:8200（首次启动打印 admin 初始密码）
 python tools/center_demo.py                # 总后台演示数据 http://127.0.0.1:8210（账号见脚本开头）
@@ -215,10 +216,11 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 
 - 呼叫教师：小屏「呼叫教师」→ `engine.last_call` 随快照上报 → 总后台处置队列置顶「求助」，老师点「已知晓」（`POST /api/desks/{id}/call_ack`，只在总后台记录）后消失，10 分钟未处理也自动消失。
 - 没接控制盒时终端用模拟温湿度维持界面（`telemetry.source = simulated`），总后台实验桌页和小屏不显示这些数值，标「控制盒未接入」。
+- 删除红外测温（2026-10-24）：MLX90614 焊点不可靠、接上会拖垮整条 I2C 总线，改为 SHT30 放在加热器旁做"台面温度计"。固件、协议说明、规则、温度趋势、小屏 / 网页 / 电脑大窗口 / 总后台、测试已同步修改；新固件已编译通过，**还没烧录到控制盒**。
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、开发板本机控制台、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、交叉验证（三级风险 + 处置动作）、台面安全区。
 - 分层上报（2026-10-23）：`cross_check.tiers()`、总后台分层视角、演示脚本的「摘防护吃东西」场景（LG-E01）已完成；新增用例只在无界面库的环境里单独跑过判级与兜底逻辑，完整三套测试需在装好依赖的电脑上重跑确认。
 - 总后台（2026-10-23）：后端 + 网页前端完成，浏览器实测通过（`tools/center_demo.py` 演示数据）；开发板程序（`center_link.py`）与总后台已在本机联调通过（上报、阈值下发与硬上限拦截、远程断电 / 静音、画面与问答代理、断线重连、离线判定，另有自动测试），尚未在真实开发板上跑。模型看板的训练集图片数需管理员在页面上填写（数据集不在仓库里）；语音合成需在总后台机器上 `pip install edge-tts` 且联网。
 - 开发板：视美泰 AIOT-3588A（4GB，系统在 16GB TF 卡，Ubuntu 22.04）已调通小屏、USB 摄像头、开机自启（edge 模式）。RKNN 模型已导出（rknn-toolkit2 2.3.2，FP16），真机 NPU 实测（`tools/check_npu.py`）ppe_best 120 ms/帧、chem_best 116 ms/帧，结果与 .pt 一致。
 - ESP32 固件：已在 ESP32-S3-N8R8 真机烧录，串口协议、断电 ACK 往返（中位 4.9 ms）实测正常；蜂鸣器为非阻塞。传感器、继电器、控制键接上后的整机联调未完成。V-JEPA 2 功能已按计划移除。
 - 截图和演示视频是电脑屏幕录像，不是真实实验台画面。
-- 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」，不是默认：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`）；开发板本机控制台按浏览器切换（恢复旧版靛蓝描边 + Zpix）；实验台小屏**默认就是像素风格**（`config.yaml → ui.style: pixel`，改成 standard 用新版）。电脑大窗口（main_window.py）保持旧版。
+- 字体：默认标题用得意黑（Smiley Sans）、正文系统黑体、数字 JetBrains Mono，均为 SIL OFL 开源。旧版 Zpix 像素字体（`LabSafetyMonitor/Zpix.ttf`，非开源协议，商用需作者授权）保留为可选的「像素风格」，不是默认：总后台按账号设置（`users.ui_style = pixel`，`PATCH /api/me/prefs`）；开发板本机控制台按浏览器切换（恢复旧版靛蓝描边 + Zpix）；实验台小屏默认新版（`config.yaml → ui.style: standard`，改成 pixel 用旧版像素风格）。电脑大窗口（main_window.py）保持旧版。

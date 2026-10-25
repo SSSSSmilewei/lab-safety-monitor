@@ -2,11 +2,11 @@
 交叉验证：人员模型 × 器皿模型 × 传感器 → 当前工况与三级风险
 src/core/cross_check.py
 
-单看一路数据容易误判："没戴护目镜"在整理台面时只是提醒，在加热沸腾的烧杯旁边就是飞溅风险；
+单看一路数据容易误判："没戴护目镜"在整理台面时只是提醒，在加热中的烧杯旁边就是飞溅风险；
 "台面有试剂瓶"本身没事，和"有人在吃东西"同时出现才危险。这里把三路数据放在一起看：
   · 人员模型（全景）：是否有人、缺哪件防护、饮食、伏案
   · 器皿模型（台面）：可加热器皿、不可加热量器、靠近桌边
-  · 传感器与温度预测：是否在加热、沸腾、干烧风险分、断电锁定
+  · 传感器与温度预测：是否在加热、台面温度趋势风险分、断电锁定
 得到：工况（在做什么）+ 风险等级（低 / 中 / 高）+ 每条依据，信号灯按风险等级亮（绿 / 黄 / 红）。
 
 纯函数、确定性、可测试；只决定"提醒到什么程度"，不参与断电（断电只由 state_machine 的规则执行）。
@@ -40,8 +40,7 @@ def assess(d: Dict[str, Any], mid_score: float = MID_SCORE, high_score: float = 
       ppe_missing:    ["ppe_goggles", ...]  已确认的防护缺失
       eating, sleeping, edge_risk: bool
       chem_items:     器皿类别名列表
-      obj_temp:       热源温度 ℃ 或 None
-      heating:        是否正在加热（继电器闭合且热源温度达到加热阈值）
+      heating:        是否正在加热（接控制盒时 = 继电器闭合；演示时 = 台面温度达到加热阈值）
       wm_phase, wm_risk, wm_eta_s: 温度预测
       latched:        是否断电锁定中
       event_levels:   当前活动事件的等级列表（NOTICE / WARNING / CRITICAL）
@@ -61,7 +60,8 @@ def assess(d: Dict[str, Any], mid_score: float = MID_SCORE, high_score: float = 
     missing = [k for k in d.get("ppe_missing") or [] if k in PPE_NAMES]
     heating = bool(d.get("heating"))
     phase = d.get("wm_phase") or ""
-    boiling = phase in ("boiling", "overheat") or (phase == "heating" and d.get("wm_eta_s") is not None)
+    # 高温阶段：台面温度已超断电线，或按当前趋势会到达断电线
+    boiling = phase == "overheat" or (phase == "heating" and d.get("wm_eta_s") is not None)
     wm_risk = float(d.get("wm_risk") or 0.0)
     latched = bool(d.get("latched"))
     ev_levels = set(d.get("event_levels") or [])
@@ -72,7 +72,7 @@ def assess(d: Dict[str, Any], mid_score: float = MID_SCORE, high_score: float = 
     elif heating and present is False:
         scene = "加热中，人员不在台前"
     elif heating and boiling:
-        scene = "加热中（沸腾 / 高温阶段）"
+        scene = "加热中（高温阶段）"
     elif heating:
         scene = "加热操作中"
     elif present and items:
@@ -119,9 +119,9 @@ def assess(d: Dict[str, Any], mid_score: float = MID_SCORE, high_score: float = 
         add("器皿 × 传感器", "在加热但台面未识别到器皿，请确认摄像头角度", 10, "调整器皿位置，使其进入台面摄像头画面")
 
     if wm_risk >= 0.6:
-        add("温度预测", f"干烧风险分 {wm_risk:.2f}", 70, "立即降低火力或补充液体")
+        add("温度预测", f"超温风险分 {wm_risk:.2f}", 70, "立即降低加热功率或关闭加热")
     elif wm_risk >= 0.3:
-        add("温度预测", f"干烧风险分 {wm_risk:.2f}", 30, "注意液面，必要时降低火力")
+        add("温度预测", f"超温风险分 {wm_risk:.2f}", 30, "注意台面温度，必要时降低加热功率")
 
     score = min(100, sum(f["points"] for f in factors))
     level = "high" if score >= high_score else "mid" if score >= mid_score else "low"
@@ -158,7 +158,7 @@ def tiers(r: Dict[str, Any], d: Dict[str, Any], mid_score: float = MID_SCORE,
           high_score: float = HIGH_SCORE) -> Dict[str, Dict[str, Any]]:
     """
     由学生端结果推出另外两层。额外输入（缺省时退回 event_levels）：
-      hazard_levels: 当前活动的安全规则事件等级（干烧、烟雾、加热无人等，不含饮食、防护这类行为事件）
+      hazard_levels: 当前活动的安全规则事件等级（超温、烟雾、加热无人等，不含饮食、防护这类行为事件）
       called:        学生最近在终端上按了「呼叫教师」
     """
     latched = bool(d.get("latched"))

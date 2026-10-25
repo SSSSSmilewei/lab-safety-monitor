@@ -14,8 +14,9 @@ from serial_comm import (build_frame, FrameParser, CMD_HEARTBEAT, CMD_POWER_OFF,
 class FakeMCU:
     """实现 pyserial 对象中 SerialComm 用到的部分：read / write / close / is_open"""
 
-    HARD_LIMIT_C = 150.0
-    RESET_MAX_C = 120.0        # 与固件 RESET_MAX_C / RESET_SMOKE_MAX 一致
+    HARD_LIMIT_C = 70.0        # 台面温度（SHT30）本地断电线，与固件 HARD_LIMIT_C 一致
+    RESET_MAX_C = 50.0         # 与固件 RESET_MAX_C / RESET_SMOKE_MAX 一致
+    WATCHDOG_CUT_S = 30.0      # 与固件 WATCHDOG_CUT_MS 一致
     RESET_SMOKE_MAX = 1800
 
     def __init__(self):
@@ -24,7 +25,8 @@ class FakeMCU:
         self._lock = threading.Lock()
         self._parser = FrameParser()
         self._seq = 0
-        self.temp, self.humi, self.obj_temp, self.smoke = 25.0, 55.0, 30.0, 300
+        self.temp, self.humi, self.smoke = 25.0, 55.0, 300
+        self.watchdog = False           # True 时模拟固件看门狗（默认关，避免影响不发心跳的用例）
         self.relay_on, self.latched, self.cut_reason = True, False, 0
         self.alert_level = 0
         self.voices = []
@@ -62,7 +64,8 @@ class FakeMCU:
         self.relay_on = False
         self.latched = True
         self.cut_reason = reason
-        self._send(MSG_EVENT, struct.pack("<Bh", event_code, int(self.obj_temp * 10)))
+        value = 0 if self.temp is None else int(self.temp * 10)
+        self._send(MSG_EVENT, struct.pack("<Bh", event_code, value))
 
     def _on_cmd(self, seq, cmd, payload):
         if cmd == CMD_HEARTBEAT:
@@ -93,7 +96,8 @@ class FakeMCU:
             self.press_reset()
 
     def press_reset(self):
-        blocked = self.obj_temp >= self.RESET_MAX_C or self.smoke >= self.RESET_SMOKE_MAX
+        hot = self.temp is not None and self.temp >= self.RESET_MAX_C
+        blocked = hot or self.smoke >= self.RESET_SMOKE_MAX
         if blocked:
             self._send(MSG_EVENT, struct.pack("<Bh", 6, 0))
             return
@@ -104,22 +108,26 @@ class FakeMCU:
 
     def _tick(self):
         now = time.time()
-        if self.obj_temp >= self.HARD_LIMIT_C and not self.latched:
+        if self.temp is not None and self.temp >= self.HARD_LIMIT_C and not self.latched:
             self._cut(1, 1)
+        if (self.watchdog and self.relay_on and self.last_hb
+                and now - self.last_hb > self.WATCHDOG_CUT_S and not self.latched):
+            self._cut(3, 3)
         if now - self._last_tel >= 0.1:
             self._last_tel = now
             flags = (self.relay_on << 0) | (self.latched << 1) | ((now - self.last_hb < 5) << 2) \
-                | (1 << 3) | (1 << 4) | (1 << 5)
+                | ((self.temp is not None) << 3) | (1 << 5)
             # temp / humi 设为 None 模拟 SHT30 掉线（按协议上报无效值）
             t10 = 0x7FFF if self.temp is None else int(self.temp * 10)
             h10 = 0xFFFF if self.humi is None else int(self.humi * 10)
             payload = struct.pack("<hHhHBB", t10, h10,
-                                  int(self.obj_temp * 10), int(self.smoke), flags, self.cut_reason)
+                                  0x7FFF, int(self.smoke), flags, self.cut_reason)
             self._send(MSG_TELEMETRY, payload)
             if time.time() >= self.manual_until:
                 from src.core.env_control import control_law
                 self.fan_pwm, self.humid_on, _ = control_law(
                     self.temp, self.humi, self.smoke, self.env["t_set"], self.env["h_low"],
-                    self.env["h_high"], 1200, self.fan_pwm, self.humid_on)
+                    self.env["h_high"], 1200, self.fan_pwm, self.humid_on,
+                    button_cut=self.latched and self.cut_reason == 5)
             self._send(MSG_ENV_STATUS, bytes([self.fan_pwm, int(self.humid_on),
                                               1 if time.time() < self.manual_until else 0]))

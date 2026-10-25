@@ -90,7 +90,7 @@
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="hd" style="font-size:16px">' + esc(x.area.name) + '</span>' +
             '<span class="' + L.tag + '">' + (d && d.latched ? '锁定' : L.text) + '</span></div>' +
             '<div style="font-weight:600">' + esc(scene) + '</div><div class="mut" style="min-height:20px">' + esc(reason) + '</div>' +
-            '<div class="ft"><span style="display:flex;align-items:center;gap:4px">' + icon('thermo', 16) + '<span class="num">' + (d ? LG.fmt(d.obj_temp, 1, '℃') : '--') + '</span></span>' +
+            '<div class="ft"><span style="display:flex;align-items:center;gap:4px">' + icon('thermo', 16) + '<span class="num">' + (d ? LG.fmt(d.temp, 1, '℃') : '--') + '</span></span>' +
             '<span class="num mut">' + (d ? LG.ago(d.last_seen) : '') + '</span></div></div></a>';
         }).join('') + '</div>';
     }).join('');
@@ -142,7 +142,7 @@
           var tip = LG.pathOf(a.id) + ' · ' + (!d ? '未绑定终端' : !d.online ? '终端离线' : (d.latched ? '断电锁定' : L.text + (d.scene ? ' · ' + d.scene : '')));
           return '<a class="pdesk lv-' + lv + (dim ? ' dim' : '') + '" href="#/desk/' + a.id + '" style="' + box(a.layout || dauto[j]) + '" title="' + esc(tip) + '">' +
             '<span class="pn">' + esc(a.name.replace(/号桌$/, '')) + '</span>' +
-            '<span class="pv num">' + (d && d.latched ? icon('lock', 14) : d && d.online && d.obj_temp != null ? Math.round(d.obj_temp) + '℃' : (d && d.online ? '' : L.text)) + '</span>' +
+            '<span class="pv num">' + (d && d.latched ? icon('lock', 14) : d && d.online && d.temp != null ? Math.round(d.temp) + '℃' : (d && d.online ? '' : L.text)) + '</span>' +
             '<span class="sr">' + esc(tip) + '</span></a>';
         }).join('');
         return '<div class="proom' + (on ? ' on' : '') + (ds.length ? '' : ' empty-room') + '" style="' + box(r.layout || auto[i]) + '">' +

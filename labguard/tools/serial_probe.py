@@ -51,7 +51,7 @@ def main():
                 print(" ", link.status_text())
                 continue
             d = link.get_sensor_data()
-            print(f"  环境 {d['temp']}℃ {d['humi']}% | 热源 {d['obj_temp']}℃ | 烟雾 {d['smoke']} | "
+            print(f"  台面 {d['temp']}℃ {d['humi']}% | 烟雾 {d['smoke']} | "
                   f"继电器 {'闭合' if d['relay_on'] else '断开'} | 锁定 {d['latched']} | "
                   f"原因 {CUT_REASONS.get(d['cut_reason'])} | 心跳 {'正常' if d['pc_link_ok'] else '丢失'} | "
                   f"风扇 {d.get('fan_pwm')}% 加湿 {d.get('humid_on')} 手动 {d.get('env_mode')}")

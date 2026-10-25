@@ -6,7 +6,7 @@ src/config.py
 找不到文件或缺少 PyYAML 时，全部使用默认值，程序照常运行。
 用法：
     from src.config import cfg
-    cfg("rules.dry_burn_c")          -> 120
+    cfg("rules.overtemp_cut_c")      -> 55
     cfg("camera.pano", 0)
 """
 import os
@@ -17,7 +17,7 @@ from typing import Any
 
 DEFAULTS = {
     "serial": {"port": "auto", "baudrate": 115200, "heartbeat_s": 1.0, "engine_stale_s": 5.0},
-    "hardware": {"hard_limit_c": 150.0, "smoke_limit_raw": 2500},
+    "hardware": {"hard_limit_c": 70.0, "smoke_limit_raw": 2500},
     "center": {"url": "", "node_token": "", "report_s": 2.0},
     "voice": {"output": "dfplayer"},
     "camera": {"pano": 0, "desk": 0, "width": 640, "height": 480, "fourcc": "MJPG"},
@@ -28,18 +28,15 @@ DEFAULTS = {
     "cross": {"mid_score": 30, "high_score": 70, "call_hold_s": 120},
     "desk": {"edge_line": [[0.0, 0.92], [1.0, 0.92]], "edge_margin": 0.06, "zone": None},
     "rules": {
-        "heating_on_c": 50.0,
-        "dry_burn_c": 120.0,
-        "rate_c_per_s": 2.0,
-        "rate_min_c": 80.0,
+        "heating_on_c": 35.0,
+        "overtemp_cut_c": 55.0,
+        "rate_c_per_min": 3.0,
         "unattended_heating_cut_s": 60.0,
         "smoke_raw": 1800,
         "humidity_high": 80.0,
         "ambient_high_c": 40.0,
-        "fallback_ambient_cut_c": 55.0,
         "sim_latch_release_s": 10.0,
         "predict_eta_warn_s": 90.0,
-        "boil_unattended_warn_s": 300.0,
         "item_hold_s": 3.0,
     },
     "events": {
@@ -50,13 +47,13 @@ DEFAULTS = {
         "voice": {
             "ppe_goggles": 1, "ppe_coat": 2, "ppe_gloves": 3, "ppe_mask": 4, "ppe_headmask": 5,
             "eating": 6, "sleeping": 7, "edge_risk": 8, "unattended_heating": 9,
-            "dry_burn": 10, "smoke": 11, "humidity_high": 12, "dry_burn_predict": 13,
+            "overtemp": 10, "smoke": 11, "humidity_high": 12, "overtemp_predict": 13,
         },
     },
     "notify": {"webhook_url": "", "min_level": "WARNING", "skip_behavior": True},
     "demo": {"allow_ipc_telemetry": True},
-    "ui": {"wave_fps": None, "kiosk_size": None, "style": "pixel"},
-    "world_model": {"fit_window_s": 60.0, "boil_low_c": 92.0, "boil_high_c": 104.0, "boil_full_risk_s": 600.0},
+    "ui": {"wave_fps": None, "kiosk_size": None, "style": "standard"},
+    "world_model": {"fit_window_s": 60.0},
     "web": {"enabled": True, "host": "0.0.0.0", "port": 8080, "token": "", "stream_fps": 6, "stream_width": 640},
     "agent": {
         "route": "auto",

@@ -176,23 +176,39 @@
       return x.toFixed(1) + ',' + Math.max(1, Math.min(h - 1, y)).toFixed(1);
     }).join(' ');
   }
+  function thermoSvg(t, warn, cut, color) {
+    var lo = 10, hi = 70, top = 3, bottom = 46;
+    var y = function (v) { return bottom - (bottom - top) * (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo); };
+    var fill = t == null ? '#C5CAE9' : color, yt = t == null ? bottom : y(t);
+    return '<rect x="8" y="1" width="8" height="50" rx="4" fill="#fff" stroke="' + C.ink + '" stroke-width="1.5"/>' +
+      '<circle cx="12" cy="55" r="7.5" fill="#fff" stroke="' + C.ink + '" stroke-width="1.5"/>' +
+      '<circle cx="12" cy="55" r="5.5" fill="' + fill + '"/>' +
+      (t == null ? '' : '<rect x="10" y="' + yt.toFixed(1) + '" width="4" height="' + (52 - yt).toFixed(1) + '" fill="' + fill + '"/>') +
+      '<line x1="4" x2="20" y1="' + y(warn) + '" y2="' + y(warn) + '" stroke="' + C.warn + '" stroke-width="2"/>' +
+      '<line x1="4" x2="20" y1="' + y(cut) + '" y2="' + y(cut) + '" stroke="' + C.danger + '" stroke-width="2"/>';
+  }
+  function benchTemp(s) {   // 没接控制盒时的模拟温度只用于维持界面，不当实测值显示
+    return s.telemetry.source === 'simulated' ? null : s.telemetry.temp;
+  }
   function renderHeat(s) {
-    var t = s.telemetry.obj_temp, wm = s.world_model, thr = s.rules.dry_burn_c, card = $('heatCard');
-    $('heatThr').textContent = '干烧阈值 ' + thr + '℃';
+    var t = benchTemp(s), wm = s.world_model, r = s.rules, thr = r.overtemp_cut_c, warn = r.ambient_high_c, card = $('heatCard');
+    $('heatThr').textContent = '提醒 ' + warn + '℃ · 断电 ' + thr + '℃';
     $('heatVal').textContent = t == null ? '--.-' : t.toFixed(1);
     heatHist = (wm.history || []).map(function (p) { return p[1]; });
-    var lv = 'ok', tag = '√ 常温', eta = '未在加热 · 无干烧风险', etaColor = C.dim;
-    if (t == null) { tag = '未接入'; eta = '未接入热源测温（使用环境温度兜底规则）'; }
-    else if (t >= thr) { lv = 'bad'; tag = '■ 干烧'; eta = '已超过干烧阈值'; etaColor = C.dangerDeep; }
-    else if (t >= s.rules.heating_on_c) {
-      lv = wm.eta_s != null && wm.eta_s <= s.rules.predict_eta_warn_s ? 'warn' : 'ok';
-      tag = '▲ ' + (wm.phase_text || '加热中');
-      if (wm.eta_s != null) { eta = '已越过沸点仍在升温（液体可能已烧干）· 约 ' + Math.round(wm.eta_s) + ' 秒后达到 ' + thr + '℃'; etaColor = lv === 'warn' ? C.warnText : C.ink; }
-      else if (wm.eta_boil_s != null) eta = '预测：约 ' + Math.round(wm.eta_boil_s) + ' 秒后沸腾';
-      else if (wm.phase === 'boiling') eta = '沸腾已持续 ' + Math.round(wm.plateau_s) + ' 秒 · 风险 ' + Math.round(wm.risk * 100) + '%';
-      else if (t >= 90 && t < 104) eta = '接近沸点';
-      else if (wm.t_inf != null && wm.t_inf < 90) eta = '按当前趋势将稳定在约 ' + Math.round(wm.t_inf) + '℃';
-      else eta = '预测：' + (wm.phase_text || '采样中');
+    var lv = 'ok', tag = '√ 常温', eta = '温度稳定 · 无超温风险', etaColor = C.dim;
+    if (t == null) { tag = '无数据'; eta = '控制盒未接入或温度计无数据'; }
+    else if (t >= thr) { lv = 'bad'; tag = '■ 超温'; eta = '已超过断电线'; etaColor = C.dangerDeep; }
+    else {
+      if (t >= warn) { lv = 'warn'; tag = '▲ 偏高'; }
+      else if (s.heating) tag = '▲ 加热中';
+      else if (wm.phase && ['no_sensor', 'idle', 'steady'].indexOf(wm.phase) < 0) tag = wm.phase_text || tag;
+      if (wm.eta_s != null && wm.phase === 'heating') {
+        if (wm.eta_s <= r.predict_eta_warn_s) lv = 'warn';
+        eta = '升温 ' + fmt(wm.slope_per_min, 1, '℃/min') + ' · 约 ' + Math.round(wm.eta_s) + ' 秒后到断电线';
+        etaColor = lv === 'warn' ? C.warnText : C.ink;
+      } else if (wm.slope_per_min != null && wm.slope_per_min <= -0.3) eta = '降温中 · ' + fmt(wm.slope_per_min, 1, '℃/min');
+      else if (wm.phase === 'warming_up') eta = '温度预测采样中…';
+      else if (t >= warn) { eta = '高于提醒线 · 请检查加热器与通风'; etaColor = C.warnText; }
     }
     card.className = 'card heat lv-' + lv;
     card.style.boxShadow = PIX ? '6px 6px 0 ' + ({ ok: C.primary, warn: C.warn, bad: C.danger })[lv] : '';
@@ -200,7 +216,8 @@
     tg.style.background = { ok: '#DDF7EC', warn: C.warn, bad: C.danger }[lv]; tg.style.color = { ok: C.safe, warn: C.warnInk, bad: '#fff' }[lv];
     if (t == null) { tg.style.background = '#E8EAF6'; tg.style.color = C.ink; }
     $('heatEta').textContent = eta; $('heatEta').style.color = etaColor;
-    var fc = (wm.forecast || []).map(function (p) { return p[1]; });
+    $('heatThermo').innerHTML = thermoSvg(t, warn, thr, { ok: C.safe, warn: C.warn, bad: C.danger }[lv]);
+    var fc = t == null ? [] : (wm.forecast || []).map(function (p) { return p[1]; });
     var all = heatHist.concat(fc).concat([thr]);
     var lo = Math.min.apply(null, all.concat([20])) - 5, hi = Math.max.apply(null, all) + 5;
     var yThr = 3 + 42 * (1 - (thr - lo) / (hi - lo));
@@ -215,7 +232,8 @@
   }
   function renderTiles(s) {
     var t = s.telemetry, r = s.rules;
-    tile('tTemp', fmt(t.temp, 1, '℃'), t.temp > r.ambient_high_c ? 'warn' : 'ok', t.temp > r.ambient_high_c ? '▲ 过高' : '上限 ' + r.ambient_high_c + '℃');
+    var rate = benchTemp(s) == null ? null : s.world_model.slope_per_min, fast = rate != null && rate >= r.rate_c_per_min;
+    tile('tTemp', rate == null ? '--' : (rate > 0 ? '+' : '') + rate.toFixed(1), fast ? 'warn' : 'ok', fast ? '▲ 升温过快\n℃/min' : '℃/min · 提醒 ' + r.rate_c_per_min);
     tile('tHumi', fmt(t.humi, 0, '%'), t.humi > r.humidity_high ? 'warn' : 'ok', t.humi > r.humidity_high ? '▲ 高湿' : '上限 ' + r.humidity_high + '%');
     tile('tSmoke', t.smoke == null ? '--' : t.smoke, t.smoke >= r.smoke_raw ? 'bad' : 'ok', t.smoke == null ? '未接入\n或预热中' : (t.smoke >= r.smoke_raw ? '■ 超标' : '阈值 ' + r.smoke_raw));
   }
@@ -224,7 +242,7 @@
     var v = s.vision, wm = s.world_model, warn = s.state === 'WARNING', crit = s.state === 'CRITICAL';
     var steps = [
       ['摄像头', 'YOLO11 识别', v.ok ? (v.fps || '运行中') : '视觉离线', v.ok ? 'ok' : 'bad'],
-      ['热源', '温度预测', wm.eta_s != null ? '干烧倒计时 ' + Math.round(wm.eta_s) + 's' : (wm.phase_text || '—'), wm.risk > 0.5 ? 'warn' : 'ok'],
+      ['温度', '台面温度趋势', wm.eta_s != null && wm.phase === 'heating' ? '约 ' + Math.round(wm.eta_s) + 's 到断电线' : (wm.phase_text || '—'), wm.risk > 0.5 ? 'warn' : 'ok'],
       ['告警', '安全等级', crit ? '紧急' : warn ? '警告' : '正常', crit ? 'bad' : warn ? 'warn' : 'ok'],
       ['电源', '加热继电器', s.latched ? '已断电锁定' : (s.link.mcu ? (s.link.relay_on ? '供电中' : '继电器断开') : '未接入'), s.latched ? 'bad' : (s.link.mcu ? 'ok' : 'warn')]
     ];
@@ -491,25 +509,27 @@
   // ---------------- 世界模型 ----------------
   var wmHist = [];
   function renderWorld(s) {
-    var wm = s.world_model, t = s.telemetry.obj_temp, thr = s.rules.dry_burn_c;
+    var wm = s.world_model, t = benchTemp(s), thr = s.rules.overtemp_cut_c, warnC = s.rules.ambient_high_c;
     wmHist = (wm.history || []).map(function (p) { return p[1]; });
     if (!$('tab-wm').classList.contains('hidden')) {
-      var fc = (wm.forecast || []).map(function (p) { return p[1]; });
+      var fc = t == null ? [] : (wm.forecast || []).map(function (p) { return p[1]; });
       var all = wmHist.concat(fc).concat([thr]);
       var lo = Math.min.apply(null, all.concat([20])) - 5, hi = Math.max.apply(null, all) + 5;
       var W = 900, H = 300, split = 600, y = function (v) { return 10 + (H - 20) * (1 - (v - lo) / (hi - lo)); };
       var grid = '';
-      for (var g = Math.ceil(lo / 20) * 20; g < hi; g += 20) grid += '<line x1="0" x2="900" y1="' + y(g) + '" y2="' + y(g) + '" stroke="#E8EAF6"/><text x="4" y="' + (y(g) - 3) + '" font-size="11" fill="' + C.dim + '">' + g + '℃</text>';
+      for (var g = Math.ceil(lo / 10) * 10; g < hi; g += 10) grid += '<line x1="0" x2="900" y1="' + y(g) + '" y2="' + y(g) + '" stroke="#E8EAF6"/><text x="4" y="' + (y(g) - 3) + '" font-size="11" fill="' + C.dim + '">' + g + '℃</text>';
       $('wmChart').innerHTML = grid + '<line x1="0" x2="900" y1="' + y(thr) + '" y2="' + y(thr) + '" stroke="' + C.danger + '" stroke-dasharray="6 5" stroke-width="2"/>' +
-        '<text x="896" y="' + (y(thr) - 5) + '" text-anchor="end" font-size="12" fill="' + C.danger + '">干烧阈值 ' + thr + '℃</text>' +
+        '<text x="896" y="' + (y(thr) - 5) + '" text-anchor="end" font-size="12" fill="' + C.danger + '">断电线 ' + thr + '℃</text>' +
+        '<line x1="0" x2="900" y1="' + y(warnC) + '" y2="' + y(warnC) + '" stroke="' + C.warn + '" stroke-dasharray="6 5" stroke-width="2"/>' +
+        '<text x="896" y="' + (y(warnC) - 5) + '" text-anchor="end" font-size="12" fill="' + C.warnText + '">偏高提醒 ' + warnC + '℃</text>' +
         '<line x1="' + split + '" x2="' + split + '" y1="0" y2="300" stroke="' + C.mid + '"/><text x="' + (split + 6) + '" y="16" font-size="11" fill="' + C.dim + '">现在 → 未来 120s</text>' +
         '<polyline fill="none" stroke="' + C.primary + '" stroke-width="2.5" points="' + sparkPath(wmHist, 0, split, lo, hi, H, 10) + '"/>' +
         (fc.length && wmHist.length ? '<polyline fill="none" stroke="' + C.primary + '" stroke-width="2.5" stroke-dasharray="6 5" points="' + sparkPath(fc, split, W, lo, hi, H, 10) + '"/>' : '') +
-        (t == null ? '<text x="450" y="150" text-anchor="middle" font-size="16" fill="' + C.dim + '">未接入热源测温（可在「环境控制」页注入演示场景）</text>' : '');
-      var kv = [['阶段', wm.phase_text], ['当前温度', fmt(wm.temp, 1, '℃')], ['升温速率', fmt(wm.slope, 2, '℃/s')],
-        ['渐近温度 T∞', fmt(wm.t_inf, 0, '℃')], ['时间常数 τ', fmt(wm.tau, 0, 's')], ['沸腾 ETA', wm.eta_boil_s == null ? '—' : Math.round(wm.eta_boil_s) + ' 秒'],
-        ['干烧 ETA', wm.eta_s == null ? '未越过沸点 / 未加热' : Math.round(wm.eta_s) + ' 秒'],
-        ['沸腾平台', Math.round(wm.plateau_s || 0) + ' 秒'], ['模型', wm.model === 'first_order' ? '一阶热平衡' : (wm.model ? '线性外推' : '—')]];
+        (t == null ? '<text x="450" y="150" text-anchor="middle" font-size="16" fill="' + C.dim + '">温度计无数据（控制盒未接入时可在「环境控制」页注入演示场景）</text>' : '');
+      var kv = [['阶段', wm.phase_text], ['台面温度', fmt(wm.temp, 1, '℃')], ['升温速度', fmt(wm.slope_per_min, 1, '℃/min')],
+        ['到偏高提醒', wm.eta_warn_s == null ? '—' : Math.round(wm.eta_warn_s) + ' 秒'],
+        ['到断电线', wm.eta_s == null ? '按当前趋势不会到达' : Math.round(wm.eta_s) + ' 秒'],
+        ['加热状态', s.heating ? '加热中' : '未加热'], ['模型', wm.model ? '直线拟合（最近 60 秒）' : '—']];
       $('wmKv').innerHTML = kv.map(function (x) { return '<span>' + x[0] + '</span><span>' + esc(x[1]) + '</span>'; }).join('');
       $('wmRisk').style.width = Math.round((wm.risk || 0) * 100) + '%';
       $('wmRisk').style.background = wm.risk > 0.6 ? C.danger : wm.risk > 0.3 ? C.warn : C.primary;
@@ -556,7 +576,7 @@
   }
   $('demoCustom').onclick = function () {
     var num = function (id) { var v = $(id).value; return v === '' ? null : Number(v); };
-    api('POST', '/api/demo/start', { scenario: 'custom', custom: { temp: num('cT'), humi: num('cH'), obj_temp: num('cO'), smoke: num('cS') } })
+    api('POST', '/api/demo/start', { scenario: 'custom', custom: { temp: num('cT'), humi: num('cH'), smoke: num('cS') } })
       .then(function () { toast('已注入自定义数值'); }).catch(function (x) { toast(x.message); });
   };
   $('demoStop').onclick = function () { api('POST', '/api/demo/stop').then(function () { toast('演示注入已停止'); }); };

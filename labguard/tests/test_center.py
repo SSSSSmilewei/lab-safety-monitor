@@ -93,10 +93,10 @@ node = TestClient(app)
 check(node.post("/api/node/report", headers={"X-Node-Token": "lg_fake"}, json={}).status_code == 401,
       "错误节点密钥被拒绝")
 snap = {"state": "WARNING", "risk": {"level": "mid", "level_text": "中危", "scene": "加热操作中"},
-        "telemetry": {"obj_temp": 63.2}, "active_events": [{"title": "量器被加热"}]}
+        "telemetry": {"temp": 43.2}, "active_events": [{"title": "量器被加热"}]}
 r = node.post("/api/node/report", headers={"X-Node-Token": node_token},
-              json={"snapshot": snap, "meta": {"web_port": 8080, "hard_limit_c": 150, "smoke_limit_raw": 2500}})
-check(r.status_code == 200 and r.json()["profile"]["rules"]["rules.dry_burn_c"] == 120, "上报后拿到默认阈值")
+              json={"snapshot": snap, "meta": {"web_port": 8080, "hard_limit_c": 70, "smoke_limit_raw": 2500}})
+check(r.status_code == 200 and r.json()["profile"]["rules"]["rules.overtemp_cut_c"] == 55, "上报后拿到默认阈值")
 ov = zhang.get("/api/overview").json()
 check(ov["summary"]["mid"] == 1 and ov["desks"][0]["scene"] == "加热操作中", "总览汇总终端风险等级")
 check(li.get("/api/overview").json()["summary"]["total"] == 0, "李老师总览里看不到 A 实验室的终端")
@@ -125,14 +125,14 @@ check(not any(k in p for p in routes for k in ("power/on", "power/restore", "unl
 
 # ---------------------------------------------------------------------------
 print("[4] 主控决策：按区域阈值")
-r = admin.put(f"/api/profiles/{ids['D']}", json={"preset": "high_temp", "rules": {"rules.dry_burn_c": 240}})
-check(r.status_code == 200 and r.json()["resolved"]["rules"]["rules.dry_burn_c"] == 240, "高温实验室可调高干烧阈值")
+r = admin.put(f"/api/profiles/{ids['D']}", json={"preset": "high_temp", "rules": {"rules.overtemp_cut_c": 63}})
+check(r.status_code == 200 and r.json()["resolved"]["rules"]["rules.overtemp_cut_c"] == 63, "加热较多的实验室可放宽超温断电阈值")
 r = admin.get(f"/api/profiles/{ids['D1']}").json()
-check(r["resolved"]["rules"]["rules.dry_burn_c"] == 240 and r["resolved"]["sources"]["rules.dry_burn_c"] == "D实验室",
+check(r["resolved"]["rules"]["rules.overtemp_cut_c"] == 63 and r["resolved"]["sources"]["rules.overtemp_cut_c"] == "D实验室",
       "实验桌继承房间阈值，并标明来源")
 r = admin.put(f"/api/profiles/{ids['D']}", json={"rules": {"serial.port": "/dev/x"}})
 check(r.status_code == 422, "白名单外参数被拒绝")
-r = admin.put(f"/api/profiles/{ids['D']}", json={"rules": {"rules.dry_burn_c": 999}})
+r = admin.put(f"/api/profiles/{ids['D']}", json={"rules": {"rules.overtemp_cut_c": 999}})
 check(r.status_code == 422, "超出范围被拒绝")
 r = admin.put(f"/api/profiles/{ids['C']}", json={"rules": {"cross.high_score": 35}})
 check(r.status_code == 422, "交叉验证高危分界低于中危 + 10 被拒绝")
@@ -231,22 +231,22 @@ check(bad == 401, "节点密钥错误 → 401")
 config_mod._config["center"]["node_token"] = tok
 link.report_once()
 n9 = store.node_by_area(desk9)
-check(link.online and n9["last_ip"] == "127.0.0.1" and n9["hard_limit_c"] == 150.0, "上报成功，总后台记下终端地址与硬上限")
+check(link.online and n9["last_ip"] == "127.0.0.1" and n9["hard_limit_c"] == 70.0, "上报成功，总后台记下终端地址与硬上限")
 check(link.center_key == store.meta("center_key"), "终端拿到总后台访问密钥")
 wm = n9["snapshot"]["world_model"]
 check("history" not in wm and "forecast" not in wm and "center" not in n9["snapshot"], "上报快照裁掉温度曲线")
 
-r = admin.put(f"/api/profiles/{desk9}", json={"rules": {"rules.dry_burn_c": 110}})
-check(r.status_code == 200, "总后台为实验桌设置干烧阈值 110℃")
+r = admin.put(f"/api/profiles/{desk9}", json={"rules": {"rules.overtemp_cut_c": 60}})
+check(r.status_code == 200, "总后台为实验桌设置超温断电阈值 60℃")
 link.report_once()
-check(cfg("rules.dry_burn_c") == 110 and not link.profile_errors, "终端应用下发的阈值")
-admin.put(f"/api/profiles/{desk9}", json={"rules": {"rules.dry_burn_c": 160}})
+check(cfg("rules.overtemp_cut_c") == 60 and not link.profile_errors, "终端应用下发的阈值")
+admin.put(f"/api/profiles/{desk9}", json={"rules": {"rules.overtemp_cut_c": 68}})
 link.report_once()
-check(cfg("rules.dry_burn_c") == 110 and "rules.dry_burn_c" in link.profile_errors,
+check(cfg("rules.overtemp_cut_c") == 60 and "rules.overtemp_cut_c" in link.profile_errors,
       "超过本机控制盒硬上限的阈值不生效，并回报原因")
 link.report_once()
 prof = admin.get(f"/api/profiles/{desk9}").json()
-check("rules.dry_burn_c" not in prof["nodes"][0]["applied"] and prof["nodes"][0]["warnings"],
+check("rules.overtemp_cut_c" not in prof["nodes"][0]["applied"] and prof["nodes"][0]["warnings"],
       "总后台看到该项未生效及硬上限提示")
 
 admin.post(f"/api/desks/{desk9}/command", json={"cmd": "cut_power", "confirm": True})
@@ -262,12 +262,12 @@ check(link.run_command({"cmd": "power_on"}) == "不支持的指令", "终端不�
 vdir = os.path.join(_tmp, "center_files", "voice")
 with open(os.path.join(vdir, "t9.mp3"), "wb") as f:
     f.write(b"ID3-test-audio")
-aid = store.add_voice_asset("干烧提醒", "upload", "t9.mp3", "admin")
-store.set_voice_map(desk9, "dry_burn", "stern", aid)
+aid = store.add_voice_asset("超温提醒", "upload", "t9.mp3", "admin")
+store.set_voice_map(desk9, "overtemp", "stern", aid)
 link.report_once()
 with open(os.path.join(_tmp, "board_voice", f"{aid}.mp3"), "rb") as f:
     got = f.read()
-check(got == b"ID3-test-audio" and voice_mod.voice.pack["map"]["dry_burn"]["stern"] == f"{aid}.mp3",
+check(got == b"ID3-test-audio" and voice_mod.voice.pack["map"]["overtemp"]["stern"] == f"{aid}.mp3",
       "终端下载并安装语音包")
 v0 = link.voice_version
 link.report_once()

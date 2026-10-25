@@ -81,25 +81,36 @@ check([g[1] for g in got] == [MSG_TELEMETRY, 0x11], "噪声 + 分片 + CRC 错�
 check(p.crc_errors == 1, "CRC 错误帧被丢弃并计数")
 
 # ---------------------------------------------------------------------------
-print("[2] 演示模式（无下位机）：兜底规则 + 自动解锁")
+print("[2] 演示模式（无下位机）：台面超温断电 + 自动解锁 + 按温度判定加热")
 SerialComm._shared = None
 sm = SafetyStateMachine(serial_controller=None)
 alerts = []
 sm.alert_triggered.connect(lambda d: alerts.append(d))
-telemetry.update("ipc", temp=68.0, humi=35.0, obj_temp=None, smoke=None)
-state, _ = sm.evaluate(["Beaker"], True, 68.0, 35.0)
-check(state == "CRITICAL" and sm.latched, "器皿 + 无人值守 + 环境 68℃ → CRITICAL 并锁定")
+telemetry.update("ipc", temp=68.0, humi=35.0, smoke=None)
+state, _ = sm.evaluate([], False, 68.0, 35.0)
+check(state == "CRITICAL" and sm.latched and events.is_active("overtemp"), "台面 68℃ ≥ 55℃ → 超温 CRITICAL 并锁定")
+check(alerts and alerts[-1]["event_type"] == "HIGH_RISK_OVERTEMP", "告警类型为台面超温")
 check(alerts and "演示模式" in alerts[-1]["message"], "演示模式下如实说明是软件模拟断电")
 check(events.is_active("power_latched"), "事件中心记录断电锁定")
-telemetry.update("ipc", temp=25.0, humi=55.0, obj_temp=None, smoke=None)
-state, _ = sm.evaluate(["Beaker"], True, 25.0, 55.0)
+telemetry.update("ipc", temp=25.0, humi=55.0, smoke=None)
+state, _ = sm.evaluate([], False, 25.0, 55.0)
 check(state == "CRITICAL", "危险刚解除时仍保持锁定")
 time.sleep(0.6)
-sm.evaluate(["Beaker"], True, 25.0, 55.0)
-state, _ = sm.evaluate(["Beaker"], True, 25.0, 55.0)
+sm.evaluate([], False, 25.0, 55.0)
+state, _ = sm.evaluate([], False, 25.0, 55.0)
 check(state == "NORMAL" and not sm.latched, "危险解除 0.5 秒后自动解锁")
-state, _ = sm.evaluate(["Volumetric flask"], True, 68.0, 35.0)
-check(state == "WARNING" and not sm.latched, "容量瓶不算可加热器皿，不触发兜底断电（只有环境高温告警）")
+telemetry.update("ipc", temp=36.0, humi=55.0, smoke=None)
+sm.evaluate(["Beaker"], False, 36.0, 55.0)
+check(sm.heating, "没接下位机时，台面 36℃ ≥ heating_on_c 35℃ 视为正在加热")
+telemetry.update("ipc", temp=30.0, humi=55.0, smoke=None)
+sm.evaluate(["Beaker"], False, 30.0, 55.0)
+check(not sm.heating, "台面 30℃ 不算加热")
+telemetry.update("ipc", temp=42.0, humi=55.0, smoke=None)
+state, _ = sm.evaluate(["Volumetric flask"], False, 42.0, 55.0)
+check(state == "WARNING" and events.is_active("ambient_high") and not sm.latched, "台面 42℃ > 40℃ → 偏高提醒，不断电")
+check(events.is_active("non_heatable_heating"), "加热中台面出现容量瓶 → 量器加热提醒")
+telemetry.update("ipc", temp=25.0, humi=55.0, smoke=None)
+sm.evaluate([], False, 25.0, 55.0)
 
 # ---------------------------------------------------------------------------
 print("[3] 串口未连接时，断电如实报告失败")
@@ -110,7 +121,7 @@ check(link_down.send_power_off() is False and link_down.power_off_state == "fail
       "send_power_off() 返回 False，不再假装成功")
 
 # ---------------------------------------------------------------------------
-print("[4] 仿真下位机：干烧断电 → ACK → 锁定 → 现场复位")
+print("[4] 仿真下位机：台面超温断电 → ACK → 锁定 → 现场复位")
 SerialComm._shared = None
 mcu = FakeMCU()
 link = SerialComm(port="FAKE")
@@ -128,6 +139,7 @@ link.connect()
 check(wait_until(lambda: link.is_alive), "链路建立，收到遥测")
 time.sleep(0.3)
 check(mcu.last_hb == 0, "安全判断还没运行时不发心跳")
+check(link.get_sensor_data()["obj_temp"] is None, "红外已删除：热源字段恒为无效值")
 
 sm = SafetyStateMachine(serial_controller=link)
 alerts.clear()
@@ -136,111 +148,117 @@ sm.alert_triggered.connect(lambda d: alerts.append(d))
 
 def push_hw():
     d = link.get_sensor_data()
-    telemetry.update("hardware", temp=d["temp"], humi=d["humi"], obj_temp=d["obj_temp"], smoke=d["smoke"])
+    telemetry.update("hardware", temp=d["temp"], humi=d["humi"], smoke=d["smoke"])
     return d
 
 
-mcu.obj_temp = 30.0
-time.sleep(0.2)
-push_hw()
-state, _ = sm.evaluate(["Beaker"], False, 25.0, 55.0)
-check(state == "NORMAL", "热源 30℃ 正常")
+def set_temp(v):
+    mcu.temp = v
+    wait_until(lambda: link.get_sensor_data()["temp"] == v)
+    return push_hw()
+
+
+def evaluate_hw(items=None, unattended=False):
+    d = push_hw()
+    return sm.evaluate(items or [], unattended, d["temp"], d["humi"])
+
+
+set_temp(25.0)
+state, _ = evaluate_hw(["Beaker"])
+check(state == "NORMAL", "台面 25℃ 正常")
+check(sm.heating, "接着下位机时，继电器闭合即视为正在加热")
 check(wait_until(lambda: mcu.last_hb > 0), "安全判断运行后，下位机收到心跳")
 
-mcu.obj_temp = 130.0
-wait_until(lambda: link.get_sensor_data()["obj_temp"] == 130.0)
-push_hw()
-state, _ = sm.evaluate(["Beaker"], False, 25.0, 55.0)
-check(state == "CRITICAL" and sm.latched, "热源 130℃ ≥ 120℃ → 干烧 CRITICAL")
-check(alerts[-1]["event_type"] == "HIGH_RISK_DRY_BURN" and "等待下位机确认" in alerts[-1]["message"],
+set_temp(60.0)
+state, _ = evaluate_hw(["Beaker"])
+check(state == "CRITICAL" and sm.latched, "台面 60℃ ≥ 55℃ → 超温 CRITICAL")
+check(alerts[-1]["event_type"] == "HIGH_RISK_OVERTEMP" and "等待下位机确认" in alerts[-1]["message"],
       "告警说明'已下发，等待确认'，而不是直接宣称成功")
 check(wait_until(lambda: link.power_off_state == "acked"), "下位机 ACK 确认断电")
 check(wait_until(lambda: link.get_sensor_data()["latched"]), "遥测显示下位机已锁定、继电器断开")
 check(wait_until(lambda: mcu.alert_level == 2), "心跳携带红灯等级")
 
-mcu.obj_temp = 30.0
-wait_until(lambda: link.get_sensor_data()["obj_temp"] == 30.0)
-push_hw()
-state, _ = sm.evaluate(["Beaker"], False, 25.0, 55.0)
+set_temp(25.0)
+state, _ = evaluate_hw(["Beaker"])
 check(state == "CRITICAL", "温度恢复后仍保持锁定（等待现场复位）")
+check(not sm.heating, "继电器断开后不算加热")
 
 mcu.press_reset()
 wait_until(lambda: not link.get_sensor_data()["latched"])
 time.sleep(0.15)
-push_hw()
-sm.evaluate(["Beaker"], False, 25.0, 55.0)
-state, _ = sm.evaluate(["Beaker"], False, 25.0, 55.0)
+evaluate_hw(["Beaker"])
+state, _ = evaluate_hw(["Beaker"])
 check(state == "NORMAL" and not sm.latched, "现场按复位键后解除锁定")
 check(wait_until(lambda: mcu.alert_level == 0), "解除后恢复绿灯")
 
 # ---------------------------------------------------------------------------
-print("[5] 加热中无人值守：先警告，超时后断电")
-mcu.obj_temp = 70.0
-wait_until(lambda: link.get_sensor_data()["obj_temp"] == 70.0)
-push_hw()
-state, _ = sm.evaluate(["Beaker"], True, 25.0, 55.0)
-check(state == "WARNING" and not sm.latched, "加热 70℃ + 无人 → WARNING（倒计时）")
+print("[5] 加热中（继电器闭合）无人值守：先警告，超时后断电")
+state, _ = evaluate_hw(["Beaker"], True)
+check(state == "WARNING" and not sm.latched and events.is_active("unattended_heating"),
+      "继电器闭合 + 无人 → WARNING（倒计时）")
 time.sleep(1.1)
-push_hw()
-state, _ = sm.evaluate(["Beaker"], True, 25.0, 55.0)
+state, _ = evaluate_hw(["Beaker"], True)
 check(state == "CRITICAL" and sm.latched, "持续超过 cut_s → 断电")
-mcu.obj_temp = 30.0
+check(wait_until(lambda: link.power_off_state == "acked" and link.get_sensor_data()["latched"]), "下位机确认断电")
 mcu.press_reset()
 wait_until(lambda: not link.get_sensor_data()["latched"])
 time.sleep(0.15)
-push_hw()
-sm.evaluate([], False, 25.0, 55.0)
+evaluate_hw()
 
 # ---------------------------------------------------------------------------
 print("[6] 下位机本地超温自主断电 → 上位机同步锁定")
-mcu.obj_temp = 160.0
-check(wait_until(lambda: link.get_sensor_data()["latched"]), "下位机本地规则断电")
-push_hw()
-state, _ = sm.evaluate([], False, 25.0, 55.0)
+mcu.temp = 75.0
+check(wait_until(lambda: link.get_sensor_data()["latched"]), "台面 75℃ ≥ 70℃ → 下位机本地规则断电")
+check(link.get_sensor_data()["cut_reason"] == 1, "断电原因码 1（台面超温）")
+d = push_hw()
+state, _ = sm.evaluate([], False, d["temp"], d["humi"])
 check(state == "CRITICAL" and sm.latched, "上位机同步为锁定状态")
-mcu.obj_temp = 30.0
+set_temp(25.0)
 mcu.press_reset()
 wait_until(lambda: not link.get_sensor_data()["latched"])
 time.sleep(0.15)
-push_hw()
-sm.evaluate([], False, 25.0, 55.0)
+evaluate_hw()
+evaluate_hw()
 check(not sm.latched, "复位后解除")
 
 # ---------------------------------------------------------------------------
 print("[6b] 心跳由安全判断驱动")
-sm.evaluate([], False, 25.0, 55.0)
+evaluate_hw()
 time.sleep(1.3)
 hb = mcu.last_hb
 time.sleep(1.2)
 check(mcu.last_hb == hb, "安全判断停止后心跳停发（下位机看门狗可以接管）")
-sm.evaluate([], False, 25.0, 55.0)
+evaluate_hw()
 check(wait_until(lambda: mcu.last_hb > hb), "安全判断恢复后心跳恢复")
 
 # ---------------------------------------------------------------------------
-print("[6c] 断电后不算加热；复位门槛与上位机一致")
-mcu.obj_temp = 130.0
-wait_until(lambda: link.get_sensor_data()["obj_temp"] == 130.0)
-push_hw()
-sm.evaluate([], False, 25.0, 55.0)
-check(wait_until(lambda: link.get_sensor_data()["latched"]), "130℃ 断电，继电器断开")
-mcu.obj_temp = 70.0
-wait_until(lambda: link.get_sensor_data()["obj_temp"] == 70.0)
-push_hw()
-sm.evaluate(["Beaker"], True, 25.0, 55.0)
-check(not events.is_active("unattended_heating"), "继电器已断开时，70℃ + 无人不再报加热无人")
-mcu.obj_temp = 125.0
-wait_until(lambda: link.get_sensor_data()["obj_temp"] == 125.0)
+print("[6c] 复位门槛与上位机一致；看门狗")
+set_temp(58.0)
+evaluate_hw()
+check(wait_until(lambda: link.get_sensor_data()["latched"]), "台面 58℃ 断电，继电器断开")
+evaluate_hw(["Beaker"], True)
+check(not events.is_active("unattended_heating"), "继电器已断开时，无人值守不再报加热无人")
+set_temp(52.0)
 mcu.press_reset()
 time.sleep(0.3)
-check(link.get_sensor_data()["latched"], "125℃（高于上位机干烧阈值）时复位被拒绝，不会先通电再被断电")
-mcu.obj_temp = 30.0
+check(link.get_sensor_data()["latched"], "台面 52℃（≥ 复位门槛 50℃）时复位被拒绝，不会先通电再被断电")
+set_temp(25.0)
 mcu.press_reset()
-check(wait_until(lambda: not link.get_sensor_data()["latched"]), "降到 30℃ 后复位成功")
+check(wait_until(lambda: not link.get_sensor_data()["latched"]), "降到 25℃ 后复位成功")
 time.sleep(0.15)
-push_hw()
-sm.evaluate([], False, 25.0, 55.0)
-sm.evaluate([], False, 25.0, 55.0)
+evaluate_hw()
+evaluate_hw()
 check(not sm.latched, "上位机同步解除锁定")
+mcu.watchdog, mcu.WATCHDOG_CUT_S = True, 0.6
+check(wait_until(lambda: link.get_sensor_data()["latched"] and link.get_sensor_data()["cut_reason"] == 3, 3.0),
+      "继电器闭合 + 心跳停发 → 下位机看门狗断电（不再依赖热源温度）")
+mcu.watchdog, mcu.WATCHDOG_CUT_S = False, FakeMCU.WATCHDOG_CUT_S
+mcu.press_reset()
+wait_until(lambda: not link.get_sensor_data()["latched"])
+time.sleep(0.15)
+evaluate_hw()
+evaluate_hw()
+check(not sm.latched, "看门狗断电后现场复位，上位机同步解除")
 
 # ---------------------------------------------------------------------------
 print("[6c2] 控制键：通电中长按 2 秒现场断电，再长按 2 秒复位")
@@ -248,15 +266,15 @@ mcu.press_button()
 check(wait_until(lambda: link.get_sensor_data()["latched"] and link.get_sensor_data()["cut_reason"] == 5),
       "通电中长按控制键 → 下位机断电锁定，原因码 5")
 time.sleep(0.15)
-push_hw()
-sm.evaluate([], True, 25.0, 55.0)
+evaluate_hw([], False)
 check(sm.latched and "现场按键断电" in sm.latch_reason, "上位机同步锁定，原因显示为现场按键断电")
+check(wait_until(lambda: link.get_sensor_data()["fan_pwm"] == 100), "按键断电后排风扇满速启动")
 check(any("现场按键断电" in s for s in events.recent_lines(5)), "按键断电事件记入日志")
 mcu.press_button()
 check(wait_until(lambda: not link.get_sensor_data()["latched"]), "已断电时再长按 → 复位上电")
+check(wait_until(lambda: link.get_sensor_data()["fan_pwm"] < 100), "复位后排风扇回到自动控制")
 time.sleep(0.15)
-push_hw()
-sm.evaluate([], True, 25.0, 55.0)
+evaluate_hw([], False)
 check(not sm.latched, "上位机随之解除锁定")
 
 # ---------------------------------------------------------------------------
@@ -275,13 +293,13 @@ check(not events.is_active("env_sensor_fault"), "传感器恢复后提醒解除"
 # ---------------------------------------------------------------------------
 print("[7] 下位机不回 ACK：断电失败如实上报，并持续重发")
 mcu.drop_acks = True
-mcu.obj_temp = 130.0
-wait_until(lambda: link.get_sensor_data()["obj_temp"] == 130.0)
-push_hw()
-sm.evaluate([], False, 25.0, 55.0)
+mcu.smoke = 2000
+wait_until(lambda: link.get_sensor_data()["smoke"] == 2000)
+evaluate_hw()
 check(wait_until(lambda: link.power_off_state == "failed_no_ack", 2.0), "3 次未收到 ACK → failed_no_ack")
 check(any("断电指令未确认" in line for line in events.recent_lines(20)), "事件日志提示人工断电")
 mcu.drop_acks = False
+mcu.smoke = 300
 link.disconnect()
 check(not link.is_open, "主动断开")
 

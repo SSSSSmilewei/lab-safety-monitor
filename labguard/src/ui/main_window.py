@@ -6,7 +6,7 @@ src/ui/main_window.py
 按下会"塌陷"的机械按键、底部流动海浪。
 本版在此基础上：
   · 统一色板：遥测卡片从亮黄黑边改为与整体一致的靛蓝体系，状态色（安全/警告/紧急）全局统一
-  · 信息补全：热源温度、烟雾、下位机链路、继电器与断电锁定状态上屏；紧急状态顶部横幅
+  · 信息补全：台面温度、升温速度、烟雾、下位机链路、继电器与断电锁定状态上屏；紧急状态顶部横幅
   · 事件卡片：视觉违规 / 安全告警自动生成卡片（不再只能手动抓拍），评审结果写回事件库
   · 香橙派性能：大面板的硬阴影改为自绘（不再使用离屏渲染的 QGraphicsEffect）；
     海浪只重绘底部波浪带并可配置帧率；样式只在状态变化时更新
@@ -445,7 +445,7 @@ class MetricTile(QWidget):
 
 class TelemetryCard(Card):
     """
-    环境遥测面板：环境温度 / 相对湿度 / 热源表面温度 / 烟雾 四个数值块，
+    环境遥测面板：台面温度 / 相对湿度 / 升温速度 / 烟雾 四个数值块，
     以及数据来源、综合安全状态、下位机链路、继电器与断电锁定状态。
     """
 
@@ -475,9 +475,9 @@ class TelemetryCard(Card):
 
         tiles = QHBoxLayout()
         tiles.setSpacing(10)
-        self.tile_temp = MetricTile("SENSOR A // 环境温度")
+        self.tile_temp = MetricTile("SENSOR A // 台面温度")
         self.tile_humi = MetricTile("SENSOR B // 相对湿度")
-        self.tile_obj = MetricTile("SENSOR C // 热源表面温度")
+        self.tile_obj = MetricTile("SENSOR C // 升温速度")
         self.tile_smoke = MetricTile("SENSOR D // 烟雾浓度")
         for t in (self.tile_temp, self.tile_humi, self.tile_obj, self.tile_smoke):
             tiles.addWidget(t, stretch=1)
@@ -500,7 +500,7 @@ class TelemetryCard(Card):
         is_simulated: bool = False,
         is_external: bool = False,
         status_text: Optional[str] = None,
-        obj_temp: Optional[float] = None,
+        rate: Optional[float] = None,
         smoke: Optional[int] = None,
         link_online: Optional[bool] = None,
         relay_on: Optional[bool] = None,
@@ -511,22 +511,24 @@ class TelemetryCard(Card):
         """更新遥测数值与徽标。综合状态以状态机为准（state / status_text），不再自行判断阈值。"""
         amb_high = float(cfg("rules.ambient_high_c", 40.0))
         humi_high = float(cfg("rules.humidity_high", 80.0))
-        heat_on = float(cfg("rules.heating_on_c", 50.0))
-        dry = float(cfg("rules.dry_burn_c", 120.0))
+        cut = float(cfg("rules.overtemp_cut_c", 55.0))
+        rate_th = float(cfg("rules.rate_c_per_min", 3.0))
         smoke_th = int(cfg("rules.smoke_raw", 1800))
 
         t_hot = temp > amb_high
+        t_cut = temp >= cut
         h_hi = humi > humi_high
-        self.tile_temp.set_value(f"{temp:.1f} ℃", "warn" if t_hot else "ok",
-                                 f"{'▲ 偏高' if t_hot else '√ 正常'} · 告警 > {amb_high:.0f}℃")
+        self.tile_temp.set_value(f"{temp:.1f} ℃", "danger" if t_cut else ("warn" if t_hot else "ok"),
+                                 f"{'■ 超温' if t_cut else ('▲ 偏高' if t_hot else '√ 正常')}"
+                                 f" · 提醒 {amb_high:.0f}℃ · 断电 {cut:.0f}℃")
         self.tile_humi.set_value(f"{humi:.1f} %", "warn" if h_hi else "ok",
                                  f"{'▲ 过高' if h_hi else '√ 正常'} · 告警 > {humi_high:.0f}%")
-        if obj_temp is None:
-            self.tile_obj.set_value("未接入", "idle", "MLX90614 红外测温")
+        if rate is None:
+            self.tile_obj.set_value("采样中", "idle", "最近 60 秒台面温度拟合")
         else:
-            lvl = "danger" if obj_temp >= dry else ("warn" if obj_temp >= heat_on else "ok")
-            tag = "■ 干烧" if obj_temp >= dry else ("▲ 加热中" if obj_temp >= heat_on else "√ 常温")
-            self.tile_obj.set_value(f"{obj_temp:.1f} ℃", lvl, f"{tag} · 干烧 ≥ {dry:.0f}℃")
+            fast = rate >= rate_th
+            self.tile_obj.set_value(f"{rate:+.1f} ℃/min", "warn" if fast else "ok",
+                                    f"{'▲ 升温过快' if fast else '√ 平稳'} · 提醒 ≥ {rate_th:.1f}")
         if smoke is None:
             self.tile_smoke.set_value("未接入", "idle", "MQ-2 未接入或预热中")
         else:
@@ -565,7 +567,7 @@ class TelemetryCard(Card):
                         shadow=color if state != "NORMAL" else T.PRIMARY)
 
         if footer is None:
-            footer = (f"联动阈值：热源 ≥ {dry:.0f}℃ 断电 · 加热无人 {float(cfg('rules.unattended_heating_cut_s', 60)):.0f}s 断电"
+            footer = (f"联动阈值：台面 ≥ {cut:.0f}℃ 断电 · 加热无人 {float(cfg('rules.unattended_heating_cut_s', 60)):.0f}s 断电"
                       f" · 烟雾 ≥ {smoke_th} 断电 · 湿度 > {humi_high:.0f}% 告警")
         if footer != self._footer_key:
             self._footer_key = footer
@@ -774,7 +776,7 @@ class MainWindow(QMainWindow):
     实验室安全监控系统主窗口
     集成：
     1. 双路实时监控推流与渲染
-    2. 多源环境遥测面板（环境温湿度 / 热源温度 / 烟雾 / 下位机 / 继电器）
+    2. 多源环境遥测面板（台面温湿度 / 升温速度 / 烟雾 / 下位机 / 继电器）
     3. 边缘状态机多模态安全判定与继电器硬件执行闭环（紧急横幅 + 断电锁定展示）
     4. 事件卡片自动生成 + 专家评审计分流水线（评审结果写回事件库）
     """
@@ -1147,7 +1149,7 @@ class MainWindow(QMainWindow):
             is_simulated=self.sensor_worker.is_simulated,
             is_external=self.sensor_worker.is_external_controlled,
             status_text=state,
-            obj_temp=snap.get("obj_temp"),
+            rate=sm.world_model.snapshot().get("slope_per_min"),
             smoke=snap.get("smoke"),
             link_online=alive,
             relay_on=hw.get("relay_on") if alive else None,

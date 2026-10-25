@@ -57,25 +57,24 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {
             "n": {"type": "integer", "description": "条数，默认 10"}}}}},
     {"type": "function", "function": {
-        "name": "get_forecast", "description": "获取热力学世界模型的温度预测：阶段、干烧 ETA、未来 120 秒轨迹",
+        "name": "get_forecast", "description": "获取台面温度趋势预测：阶段、升温速度、到达断电线的 ETA、未来 120 秒走势",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
         "name": "search_manual", "description": "在实验室安全手册中检索相关条款",
         "parameters": {"type": "object", "properties": {
-            "query": {"type": "string", "description": "检索关键词，如 干烧 处置"}}, "required": ["query"]}}},
+            "query": {"type": "string", "description": "检索关键词，如 超温 处置"}}, "required": ["query"]}}},
 ]
 TOOL_NAMES = {t["function"]["name"] for t in TOOLS}
 
 # 规则模板：没有可用大模型时的兜底研判
 RULE_ADVICE = {
-    "dry_burn": ("热源温度超过干烧阈值，容器内液体可能已蒸干", ["系统已断电，保持断电状态", "等待器皿自然冷却，勿用冷水浇淋", "确认无冒烟后到现场按复位键"]),
-    "dry_burn_predict": ("热源越过沸点仍在升温，即将达到干烧温度", ["立即降低加热功率或补充液体", "回到实验台查看液面", "如无法处理，先关闭热源"]),
-    "temp_rate": ("热源升温过快，可能液体将尽或功率过大", ["降低加热功率", "检查容器液面", "必要时关闭热源"]),
+    "overtemp": ("加热器旁台面温度超过断电线，可能容器已烧干或加热失控", ["系统已断电，保持断电状态", "等待器皿自然冷却，勿用冷水浇淋", "确认无冒烟后到现场按复位键"]),
+    "overtemp_predict": ("台面温度持续上升，按当前速度即将达到断电线", ["立即降低加热功率", "回到实验台查看容器液面", "如无法处理，先关闭加热"]),
+    "temp_rate": ("台面升温过快，可能加热功率过大或容器将烧干", ["降低加热功率", "检查容器液面", "必要时关闭加热"]),
     "unattended_heating": ("加热过程中无人值守", ["立即返回实验台", "如需离开，先关闭热源", "超时系统将自动断电"]),
-    "dry_burn_fallback": ("未接热源测温，按环境温度兜底判断疑似干烧", ["系统已断电", "到现场确认器皿状态", "建议接入红外测温"]),
     "smoke": ("检测到烟雾或可燃气体超标", ["系统已断电，开启排风", "停止明火、疏散人员", "确认无火情后排查原因"]),
     "humidity_high": ("环境湿度过高", ["开启排风或除湿", "检查吸湿性试剂是否密封", "精密仪器加防潮措施"]),
-    "ambient_high": ("环境温度过高", ["加强通风", "检查是否有设备异常发热", "挥发性试剂移入通风橱"]),
+    "ambient_high": ("台面温度偏高", ["加强通风", "检查加热器是否异常发热", "挥发性试剂移入通风橱"]),
     "non_heatable_heating": ("加热时台面出现不可加热的量器", ["确认量器未被加热", "需加热的溶液转入烧杯或烧瓶", "量器远离热源"]),
     "edge_risk": ("器皿靠近台面边缘", ["将器皿移至台面内侧 10 厘米以上", "整理台面通道"]),
     "eating": ("实验区出现饮食行为", ["立即停止饮食", "离开实验区后洗手"]),
@@ -120,8 +119,8 @@ class SafetyAgent:
         return {"state": s["state"], "state_text": s["state_text"], "latched": s["latched"],
                 "latch_reason": s["latch_reason"], "telemetry": s["telemetry"],
                 "vision": {k: s["vision"][k] for k in ("person_present", "unattended", "chem_items", "violations")},
-                "world_model": {k: s["world_model"].get(k) for k in ("phase_text", "temp", "eta_s", "t_inf",
-                                                                      "plateau_s", "risk")},
+                "world_model": {k: s["world_model"].get(k) for k in ("phase_text", "temp", "slope_per_min",
+                                                                      "eta_s", "risk")},
                 "active_events": s["active_events"],
                 "risk": {k: s.get("risk", {}).get(k) for k in ("level_text", "scene", "score", "factors")}}
 

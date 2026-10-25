@@ -23,9 +23,9 @@ center:
   report_s: 2.0         # 上报间隔 s
 
 # ---- 本控制盒的硬上限（必须与烧进固件的值一致；网页上改不了）----
-# 高温实验室换用高量程测温仪时，固件和这里一起改大；开发板的断电阈值只能设在硬上限以下
+# 温度来自加热器旁的 SHT30（台面温度）；开发板的断电阈值只能设在硬上限以下
 hardware:
-  hard_limit_c: 150     # 固件 HARD_LIMIT_C：热源超过就由下位机本地断电
+  hard_limit_c: 70      # 固件 HARD_LIMIT_C：台面温度超过就由下位机本地断电
   smoke_limit_raw: 2500 # 固件 SMOKE_LIMIT_RAW：烟雾超过就由下位机本地断电
 
 # ---- 摄像头 ----
@@ -80,18 +80,16 @@ desk:
 
 # ---- 安全规则（状态机）----
 rules:
-  heating_on_c: 50              # 热源表面温度 ≥ 该值视为"正在加热"
-  dry_burn_c: 120               # 热源表面温度 ≥ 该值判定为干烧 → 断电（水在常压下最高约 100℃）
-  rate_c_per_s: 2.0             # 升温速率 ≥ 该值……
-  rate_min_c: 80                # ……且温度 ≥ 该值 → 升温异常预警
+  # 温度都指"台面温度"：SHT30 放在加热器旁 5～10 cm。接着下位机时"正在加热" = 继电器闭合
+  heating_on_c: 35              # 没接下位机（演示）时，台面温度 ≥ 该值视为"正在加热"
+  overtemp_cut_c: 55            # 台面温度 ≥ 该值 → 断电（需低于 hardware.hard_limit_c，现场按实测调整）
+  rate_c_per_min: 3.0           # 加热中最近 1 分钟升温 ≥ 该值 → 升温过快提醒
   unattended_heating_cut_s: 60  # 加热中无人值守持续这么多秒 → 断电
   smoke_raw: 1800               # MQ-2 原始 ADC 读数（0-4095）阈值，需现场标定
   humidity_high: 80             # 湿度过高告警 %
-  ambient_high_c: 40            # 环境温度过高告警 ℃
-  fallback_ambient_cut_c: 55    # 未接入热源测温时的兜底规则：器皿 + 无人值守 + 环境温度超过该值 → 断电
+  ambient_high_c: 40            # 台面温度偏高提醒 ℃
   sim_latch_release_s: 10       # 无下位机（模拟模式）时，危险解除后多少秒自动解除断电锁定
-  predict_eta_warn_s: 90        # 越过沸点后仍在升温，预计这么多秒内达到干烧温度 → 提前提醒（不断电）
-  boil_unattended_warn_s: 300   # 沸腾持续这么多秒且无人值守 → 提醒（液体在持续蒸发）
+  predict_eta_warn_s: 90        # 按当前升温速度，预计这么多秒内达到断电线 → 提前提醒（不断电）
   item_hold_s: 3                # 器皿最近这么多秒内被识别到就算还在台面上（防止识别结果逐帧跳动导致反复告警）
 
 # ---- 事件、语音与存储 ----
@@ -110,10 +108,10 @@ events:
     sleeping: 7
     edge_risk: 8
     unattended_heating: 9
-    dry_burn: 10
+    overtemp: 10
     smoke: 11
     humidity_high: 12
-    dry_burn_predict: 13
+    overtemp_predict: 13
 
 # ---- 远程通知（L2 级别，可选）----
 notify:
@@ -127,16 +125,13 @@ demo:
 
 # ---- 界面 ----
 ui:
-  style: pixel          # 实验台小屏风格：pixel = 像素风格（Zpix 字体，默认）；standard = 新版（墨色硬边 + 得意黑）
+  style: standard       # 实验台小屏风格：standard = 新版（墨色硬边 + 得意黑，默认）；pixel = 旧版像素风格（Zpix 字体）
   wave_fps:             # 海浪动画帧率；留空 = 自动（香橙派等 ARM 设备 10，PC 25）；0 = 静止（最省 CPU）
   kiosk_size:           # 小屏分辨率；留空 = 自动读取屏幕。PC 上调试小屏可写 [800, 480]
 
-# ---- 温度预测 ----
+# ---- 温度预测（台面温度趋势）----
 world_model:
-  fit_window_s: 60      # 用最近多少秒的温度做拟合
-  boil_low_c: 92        # 沸腾平台的温度范围（水）
-  boil_high_c: 104
-  boil_full_risk_s: 600 # 沸腾持续这么久，风险分记满
+  fit_window_s: 60      # 用最近多少秒的台面温度拟合升温速度
 
 # ---- 网页大屏 ----
 web:

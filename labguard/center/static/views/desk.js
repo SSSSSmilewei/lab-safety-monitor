@@ -28,7 +28,8 @@
 
   function sensorsHtml(s) {
     var t = s.telemetry || {}, wm = s.world_model || {}, r = s.rules || {};
-    var eta = wm.eta_s != null ? '预计 ' + Math.round(wm.eta_s) + ' s 后干烧' : wm.eta_boil_s != null ? '预计 ' + Math.max(1, Math.round(wm.eta_boil_s / 60)) + ' min 后沸腾' : (wm.phase_text || '');
+    var eta = wm.eta_s != null && wm.phase === 'heating' ? '约 ' + Math.round(wm.eta_s) + ' s 到断电线' : (wm.phase_text || '');
+    var rate = wm.slope_per_min;
     var cell = function (ic, label, val, unit, sub, last) {
       return '<div class="stat"' + (last ? ' style="border-right:0"' : '') + '>' + icon(ic, 28) + '<div><div class="mut">' + label + '</div><div class="big">' + val +
         (unit ? '<span style="font-size:16px">' + unit + '</span>' : '') + '</div>' + (sub ? '<div class="mut">' + sub + '</div>' : '') + '</div></div>';
@@ -36,8 +37,8 @@
     // 没接控制盒时终端用模拟温湿度维持界面，这里不当实测值显示；演示注入的数据标明来源
     var sim = t.source === 'simulated' || !t.source, note = sim ? '控制盒未接入' : t.source === 'ipc' ? '演示注入' : '';
     if (sim) t = {};
-    return cell('thermo', '热源温度', LG.fmt(t.obj_temp, 1), '℃', note || esc(eta) + (r.dry_burn_c ? ' · 断电 <span class="num">' + r.dry_burn_c + '℃</span>' : '')) +
-      cell('building', '环境温度', LG.fmt(t.temp, 1), '℃', note) +
+    return cell('thermo', '台面温度', LG.fmt(t.temp, 1), '℃', note || esc(eta) + (r.overtemp_cut_c ? ' · 断电 <span class="num">' + r.overtemp_cut_c + '℃</span>' : '')) +
+      cell('building', '升温速度', sim || rate == null ? '--' : (rate > 0 ? '+' : '') + LG.fmt(rate, 1), '℃/min', note || (r.rate_c_per_min ? '提醒 ≥ <span class="num">' + r.rate_c_per_min + '</span>' : '')) +
       cell('drop', '相对湿度', LG.fmt(t.humi, 0), '%', note) +
       cell('smoke', '烟雾 MQ-2', t.smoke == null ? '--' : t.smoke, '', note || (r.smoke_raw ? '断电 <span class="num">' + r.smoke_raw + '</span>' : ''), true);
   }
@@ -167,12 +168,27 @@
         }).catch(LG.fail);
       };
 
-      // 画面：上一张加载完再取下一张；终端拿不到实时画面时由总后台返回演示画面（X-Frame-Source: demo）
+      // 画面：终端在线时用 MJPEG 实时流（一条连接持续推帧）；流断开或终端离线时改为逐张取图，
+      // 上一张加载完再取下一张，终端拿不到实时画面时由总后台返回演示画面（X-Frame-Source: demo）
       ['pano', 'desk'].forEach(function (w) {
         var img = LG.$('#img-' + w), no = LG.$('#noimg-' + w), tag = LG.$('#src-' + w), url = null;
-        function next(delay) { if (document.body.contains(img)) LG.later(delay, load); }
+        var streaming = false, streamFail = 0;
+        function next(delay) { if (document.body.contains(img)) LG.later(delay, load); else stopStream(); }   // 离开页面时断开实时流
         function show(msg) { img.hidden = true; tag.hidden = true; no.hidden = false; no.textContent = msg; }
+        function stopStream() { if (streaming) { streaming = false; img.onerror = null; img.removeAttribute('src'); } }
         function load() {
+          if (streaming) {                       // 流在播：只在终端离线时停掉
+            if (!online) stopStream(); else { next(2000); return; }
+          }
+          if (online && Date.now() - streamFail > 15000) {
+            streaming = true;
+            if (url) { URL.revokeObjectURL(url); url = null; }
+            img.onerror = function () { stopStream(); streamFail = Date.now(); next(500); };
+            img.src = '/api/desks/' + id + '/stream/' + w + '.mjpg?_=' + Date.now();
+            img.hidden = false; no.hidden = true; tag.hidden = true;
+            next(2000);
+            return;
+          }
           if (!online && !demo[w]) { show(LG.isAdmin() ? '无画面 · 可上传演示画面' : '无画面'); next(2000); return; }
           var src = 'live';
           fetch('/api/desks/' + id + '/frame/' + w + '.jpg?_=' + Date.now(), { credentials: 'same-origin', cache: 'no-store' }).then(function (r) {
@@ -183,7 +199,7 @@
             if (url) URL.revokeObjectURL(url);
             url = URL.createObjectURL(b); img.src = url;
             img.hidden = false; no.hidden = true; tag.hidden = src !== 'demo';
-            next(src === 'demo' ? 5000 : 1000);
+            next(src === 'demo' ? 5000 : 300);
           }).catch(function () { show('画面不可用'); next(5000); });
         }
         nudge[w] = load;
@@ -219,7 +235,7 @@
             '<span style="font-weight:600">' + esc(n.online ? (s.latched ? s.latch_reason || '' : (s.risk || {}).scene || s.state_text || '') : '终端离线') + '</span></div>' +
             '<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-right:3px solid var(--ink)">' + icon('monitor') + '<span>' + esc(n.name) + '</span>' +
             '<span class="tag ' + (n.online ? 't-low' : 't-off') + '">' + (n.online ? '在线' : '离线') + '</span><span class="mut num">' + LG.ago(n.last_seen) + '</span></div>' +
-            '<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-right:3px solid var(--ink)">' + icon('chip') + '<span>热源硬上限</span><span class="num">' + LG.fmt(n.hard_limit_c, 0, '℃') + '</span></div>' +
+            '<div style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-right:3px solid var(--ink)">' + icon('chip') + '<span>台面温度硬上限</span><span class="num">' + LG.fmt(n.hard_limit_c, 0, '℃') + '</span></div>' +
             '<div style="display:flex;align-items:center;gap:8px;padding:8px 16px">' + icon('power') + '<span>加热回路</span>' +
             (s.latched ? '<span class="tag t-high">已断电</span>' : (s.link || {}).relay_on === false ? '<span class="tag t-soft">断开</span>' : (s.link || {}).relay_on ? '<span class="tag t-low">通电</span>' : '<span class="tag t-off">未知</span>') + '</div>';
           LG.$('#dkSensors').innerHTML = sensorsHtml(s);

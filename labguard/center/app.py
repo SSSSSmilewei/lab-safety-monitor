@@ -24,7 +24,7 @@ import urllib.request
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from center import presets as presets_mod
@@ -377,7 +377,7 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
                 "risk_level": t["level"], "risk_text": t.get("level_text"), "scene": risk.get("scene"),
                 "tier": tier, "levels": {k: v["level"] for k, v in tiers.items()},
                 "reasons": t.get("reasons") or [], "notes": tiers["teacher"].get("notes") or [],
-                "obj_temp": tel.get("obj_temp"), "temp": tel.get("temp"), "humi": tel.get("humi"),
+                "temp": tel.get("temp"), "humi": tel.get("humi"),
                 "events": [e.get("title") for e in (s.get("active_events") or [])[:3]],
                 "call": _pending_call(n)}
 
@@ -562,6 +562,45 @@ def create_app(db_path: str, data_dir: Optional[str] = None, model_card: Optiona
             return Response(bytes(demo["data"]), media_type=demo["mime"],
                             headers={"Cache-Control": "no-store", "X-Frame-Source": "demo"})
         raise err or HTTPException(503, "终端离线" if n is not None else "这张实验桌还没有绑定终端")
+
+    @app.get("/api/desks/{area_id}/stream/{which}.mjpg")
+    async def desk_stream(area_id: int, which: str, u=Depends(current_user)):
+        """实时画面：转发终端的 MJPEG 流（一条连接持续推帧，比逐张取图流畅）；取不到时 503，前端改用逐张取图 / 演示画面"""
+        if which not in ("pano", "desk"):
+            raise HTTPException(404)
+        need_area(u, area_id)
+        n = store.node_by_area(area_id)
+        if n is None or not _online(n) or not (n.get("last_ip") and n.get("web_port")):
+            raise HTTPException(503, "终端离线")
+        try:
+            # 用 asyncio 连接直接转发，不占线程池（每位观看者一条长连接）
+            reader, writer = await asyncio.wait_for(asyncio.open_connection(n["last_ip"], int(n["web_port"])), 5.0)
+            writer.write((f"GET /stream/{which}.mjpg HTTP/1.0\r\nHost: {n['last_ip']}\r\n"
+                          f"X-Center-Key: {center_key}\r\n\r\n").encode())
+            await writer.drain()
+            head = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 5.0)
+        except Exception as e:
+            raise HTTPException(502, f"连不上终端：{type(e).__name__}")
+        lines = head.decode("latin-1").split("\r\n")
+        ctype = next((ln.split(":", 1)[1].strip() for ln in lines[1:] if ln.lower().startswith("content-type:")), "")
+        if " 200 " not in lines[0] + " " or not ctype.startswith("multipart/"):
+            writer.close()
+            raise HTTPException(502, f"终端返回 {lines[0][9:12] or '异常'}")
+
+        async def relay():
+            try:
+                while True:
+                    chunk = await asyncio.wait_for(reader.read(65536), 10.0)
+                    if not chunk:
+                        break
+                    yield chunk
+            except (asyncio.TimeoutError, OSError):
+                pass
+            finally:
+                writer.close()
+
+        return StreamingResponse(relay(), media_type=ctype,
+                                 headers={"Cache-Control": "no-store", "X-Frame-Source": "live"})
 
     @app.put("/api/desks/{area_id}/demo/{which}")
     async def put_demo_frame(area_id: int, which: str, request: Request, u=Depends(admin_user)):

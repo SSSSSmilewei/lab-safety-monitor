@@ -46,55 +46,39 @@ def check(cond, name):
 
 
 # ---------------------------------------------------------------------------
-print("\n[1] 热力学世界模型")
+print("\n[1] 台面温度趋势模型")
 from src.core.world_model import ThermalWorldModel
 
 wm = ThermalWorldModel()
 t0 = 1000.0
-# 一阶升温：T∞=180℃，τ=200s，从 60℃ 开始，真实到达 120℃ 的时间可解析求出
-import math
-T_inf, tau, T0 = 180.0, 400.0, 104.5   # 已越过沸点（液体已烧干）后的升温段
-true_eta_from = lambda T: -tau * math.log((T_inf - 120.0) / (T_inf - T))
 res = None
-for k in range(0, 61):
-    T = T_inf - (T_inf - T0) * math.exp(-k / tau)
-    res = wm.update(T, now=t0 + k)
-check(res["model"] == "linear", "越过沸点后只用最近 15 秒外推（不受之前数据干扰）")
-true_eta = true_eta_from(res["temp"])
-check(res["eta_s"] is not None and abs(res["eta_s"] - true_eta) / true_eta < 0.15,
-      f"干烧 ETA 误差 < 15%（预测 {res['eta_s']:.0f}s，真实 {true_eta:.0f}s）")
+for k in range(0, 61):                       # 台面温度从 30℃ 起每秒升 0.1℃（6℃/min）
+    res = wm.update(30.0 + 0.1 * k, now=t0 + k)
+check(res["model"] == "linear" and abs(res["slope_per_min"] - 6.0) < 0.2, "直线拟合出升温速度 6℃/min")
+true_eta = (55.0 - res["temp"]) / 0.1
+check(res["eta_s"] is not None and abs(res["eta_s"] - true_eta) < 5,
+      f"到断电线 55℃ 的 ETA 准确（预测 {res['eta_s']:.0f}s，真实 {true_eta:.0f}s）")
+check(res["eta_warn_s"] is not None and abs(res["eta_warn_s"] - (40.0 - res["temp"]) / 0.1) < 5,
+      "同时给出到偏高提醒线 40℃ 的 ETA")
 check(res["phase"] == "heating" and res["risk"] > 0, "阶段=升温中，风险分 > 0")
+check(len(res["forecast"]) == 13 and res["forecast"][-1][1] > res["temp"], "未来 120 秒预测曲线，每 10 秒一个点")
 
-wm_b = ThermalWorldModel()
+wm_s = ThermalWorldModel()
 for k in range(0, 40):
-    rb = wm_b.update(40.0 + 1.2 * k, now=t0 + k)
-check(rb["eta_s"] is None and rb["eta_boil_s"] is not None,
-      "低于沸点时只预测沸腾时间，不误报干烧（液体仍在）")
+    rs = wm_s.update(25.0 + (0.05 if k % 2 else -0.05), now=t0 + k)
+check(rs["phase"] == "idle" and rs["eta_s"] is None and rs["risk"] == 0, "温度基本不变 → 常温，不预测超温")
 
-wm_f = ThermalWorldModel()
-for k in range(0, 61):
-    rf = wm_f.update(90.0 - (90.0 - 30.0) * math.exp(-k / 40.0), now=t0 + k)
-check(rf["model"] == "first_order" and rf["t_inf"] is not None and abs(rf["t_inf"] - 90.0) < 8,
-      "沸点以下的升温段识别为一阶热平衡模型，估出渐近温度")
-
-wm2 = ThermalWorldModel()
-for k in range(0, 80):
-    T = 70.0 - (70.0 - 30.0) * math.exp(-k / 15.0)   # 渐近 70℃ < 干烧阈值
-    r2 = wm2.update(T, now=t0 + k)
-check(r2["will_dry_burn"] is False, "渐近温度低于阈值 → 判定不会干烧")
-
-wm3 = ThermalWorldModel()
+wm_c = ThermalWorldModel()
 for k in range(0, 40):
-    r3 = wm3.update(99.0 + (0.1 if k % 2 else -0.1), now=t0 + k * 2)
-check(r3["phase"] == "boiling" and r3["plateau_s"] > 30, "沸腾平台检测")
-wm4 = ThermalWorldModel()
-for k in range(0, 40):
-    wm4.update(99.0, now=t0 + k)                       # 沸腾平台
-for k in range(0, 14):
-    r4 = wm4.update(99.0 + 0.8 * k, now=t0 + 40 + k)   # 烧干后继续升温
-check(r4["eta_s"] is not None and abs(r4["eta_s"] - (120 - r4["temp"]) / 0.8) < 5,
-      "沸腾平台之后越过沸点继续升温 → 立即给出干烧倒计时")
-check(wm3.update(None)["phase"] == "no_sensor", "无热源测温时清空")
+    rc = wm_c.update(45.0 - 0.1 * k, now=t0 + k)
+check(rc["phase"] == "cooling" and rc["eta_s"] is None, "降温中不预测超温")
+
+wm_o = ThermalWorldModel()
+for k in range(0, 20):
+    ro = wm_o.update(56.0 + 0.01 * k, now=t0 + k)
+check(ro["phase"] == "overheat" and ro["risk"] == 1.0 and ro["eta_s"] == 0.0, "已超断电线 → 风险分记满")
+check(ro["eta_boil_s"] is None and ro["plateau_s"] == 0.0, "旧版热源模型字段保留为空值，旧调用方不报错")
+check(wm_o.update(None)["phase"] == "no_sensor", "温度计无数据时清空")
 
 # ---------------------------------------------------------------------------
 print("\n[2] 环境控制律")
@@ -219,14 +203,18 @@ check(client.get("/api/snapshot").status_code == 401, "无口令访问被拒绝"
 snap = client.get("/api/snapshot", headers=H).json()
 check(snap["state"] in ("NORMAL", "WARNING", "CRITICAL") and "world_model" in snap and "env" in snap,
       "快照包含状态、世界模型、环境控制")
-r = client.patch("/api/config", headers=H, json={"rules.dry_burn_c": 999})
+r = client.patch("/api/config", headers=H, json={"rules.overtemp_cut_c": 999})
 check(r.status_code == 422, "越界参数被拒绝")
-r = client.patch("/api/config", headers=H, json={"rules.dry_burn_c": 146})
-check(r.status_code == 422, "干烧阈值不能超过控制盒硬上限（150℃ − 5）")
+r = client.patch("/api/config", headers=H, json={"rules.overtemp_cut_c": 66})
+check(r.status_code == 422, "超温断电阈值不能超过控制盒硬上限（70℃ − 5）")
+r = client.patch("/api/config", headers=H, json={"rules.overtemp_cut_c": 42})
+check(r.status_code == 422, "超温断电阈值必须比偏高提醒（40℃）高 5℃ 以上")
+r = client.patch("/api/config", headers=H, json={"rules.dry_burn_c": 100})
+check(r.status_code == 422, "旧的干烧阈值已不可配置")
 r = client.patch("/api/config", headers=H, json={"serial.port": "/dev/evil"})
 check(r.status_code == 422, "白名单外参数被拒绝")
-r = client.patch("/api/config", headers=H, json={"rules.dry_burn_c": 130})
-check(r.status_code == 200 and config_mod.cfg("rules.dry_burn_c") == 130, "合法参数生效")
+r = client.patch("/api/config", headers=H, json={"rules.overtemp_cut_c": 58})
+check(r.status_code == 200 and config_mod.cfg("rules.overtemp_cut_c") == 58, "合法参数生效")
 routes = {getattr(rt, "path", "") for rt in client.app.routes}
 check(not any(k in p for p in routes for k in ("power/on", "power/restore", "unlock", "reset", "release")),
       "不存在任何上电 / 解锁接口")

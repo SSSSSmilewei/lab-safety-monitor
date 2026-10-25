@@ -15,17 +15,17 @@ from typing import Dict, Any, Optional
 from src.config import cfg
 from src.hardware.sensor_worker import SensorWorker
 
-# 场景：基础值 + 可选的热源温度曲线 obj(t)
+# 场景：台面温度 temp 可以是常数，也可以是随时间 t（秒）变化的曲线
 SCENARIOS: Dict[str, Dict[str, Any]] = {
-    "normal": {"name": "正常环境", "temp": 25.0, "humi": 55.0, "obj": None, "smoke": None},
-    "heating": {"name": "正常加热→沸腾", "temp": 26.0, "humi": 58.0,
-                "obj": lambda t: min(99.0, 40.0 + 1.2 * t), "smoke": 300},
-    "dry_burn": {"name": "烧干（升温突破阈值）", "temp": 27.0, "humi": 52.0,
-                 "obj": lambda t: 99.0 if t < 8 else min(160.0, 99.0 + 0.8 * (t - 8)), "smoke": 350},
-    "smoke": {"name": "烟雾超标", "temp": 27.0, "humi": 50.0, "obj": lambda t: 85.0, "smoke": 2300},
-    "humid": {"name": "高湿受潮", "temp": 25.0, "humi": 86.0, "obj": None, "smoke": None},
-    "dry_air": {"name": "空气过干", "temp": 25.0, "humi": 28.0, "obj": None, "smoke": None},
-    "hot": {"name": "环境高温", "temp": 42.0, "humi": 50.0, "obj": None, "smoke": None},
+    "normal": {"name": "正常环境", "temp": 25.0, "humi": 55.0, "smoke": None},
+    "heating": {"name": "正常加热（缓慢升温）", "humi": 58.0, "smoke": 300,
+                "temp": lambda t: min(38.0, 26.0 + 0.1 * t)},
+    "overtemp": {"name": "台面超温（升温突破断电线）", "humi": 52.0, "smoke": 350,
+                 "temp": lambda t: min(62.0, 30.0 + 0.4 * t)},
+    "smoke": {"name": "烟雾超标", "temp": 30.0, "humi": 50.0, "smoke": 2300},
+    "humid": {"name": "高湿受潮", "temp": 25.0, "humi": 86.0, "smoke": None},
+    "dry_air": {"name": "空气过干", "temp": 25.0, "humi": 28.0, "smoke": None},
+    "hot": {"name": "台面温度偏高", "temp": 42.0, "humi": 50.0, "smoke": None},
 }
 
 
@@ -74,12 +74,10 @@ class DemoInjector:
         t = time.time() - self.started
         if self.scenario == "custom":
             c = self.custom
-            return {"temp": float(c.get("temp", 25)), "humi": float(c.get("humi", 55)),
-                    "obj_temp": c.get("obj_temp"), "smoke": c.get("smoke")}
+            return {"temp": float(c.get("temp", 25)), "humi": float(c.get("humi", 55)), "smoke": c.get("smoke")}
         sc = SCENARIOS[self.scenario]
-        obj = sc["obj"](t) if callable(sc["obj"]) else sc["obj"]
-        return {"temp": sc["temp"], "humi": sc["humi"],
-                "obj_temp": round(obj, 1) if obj is not None else None, "smoke": sc["smoke"]}
+        temp = sc["temp"](t) if callable(sc["temp"]) else sc["temp"]
+        return {"temp": round(temp, 1), "humi": sc["humi"], "smoke": sc["smoke"]}
 
     def _loop(self):
         while not self._stop.is_set():
