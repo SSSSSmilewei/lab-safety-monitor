@@ -61,7 +61,7 @@ local_private/       本地私有资料（演示视频、报名表），.gitigno
 | `hub/jepa_worker.py` (247) | 电脑端 V-JEPA 2 画面异常检测（可选）；`--selftest` 不下载模型自检 |
 | `knowledge/实验室安全手册.md` | 安全助手引用的手册条款，可按学校制度修改 |
 | `deploy/orangepi/` | 开发板安装（setup.sh，视美泰 AIOT-3588A 和香橙派 5 通用）、开机自启（start.sh，自动选 edge / headless）、串口 udev 规则 |
-| `tools/` | `center_init.py` 总后台正式初始化（一栋楼 / 一间实验室 / 一张实验桌 + 一台终端 + 一个教师账号，无模拟数据，`--local` 把节点密钥写进本机配置）、`center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面、`--live LG-A01` 把一张桌留给真实开发板程序接入，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型（x86 上运行，附模拟器对比）、`check_npu.py` 板子上检查 NPU（版本、加载、速度、和 .pt 对比）、`gen_voice.py` 生成语音文件 |
+| `tools/` | `center_init.py` 总后台正式初始化（一栋楼 / 一间实验室 / 一张实验桌 + 一台终端 + 一个教师账号，无模拟数据，`--local` 把节点密钥写进本机配置）、`center_demo.py` 总后台演示（三层楼示意平面图、演示账号 demo / Demo2026show、模拟终端上报、`--images` 批量设置演示画面、`--live LG-A01,LG-A02` 把实验桌留给真实开发板程序接入，每台一份 `runtime/center_demo_live_<终端名>.yaml`，`--host 0.0.0.0 --center-url` 供局域网里的开发板接入，端口 8210）、`serial_probe.py` 串口调试、`export_rknn.py` 导出 NPU 模型（x86 上运行，附模拟器对比）、`check_npu.py` 板子上检查 NPU（版本、加载、速度、和 .pt 对比）、`gen_voice.py` 生成语音文件 |
 | `tests/` | `test_backend.py`（87 项）、`test_platform.py`（44 项）、`test_center.py`（81 项，总后台 + 开发板接入 + 平面图与演示画面 + 分层视角 + 呼叫教师）、`fake_mcu.py`（Python 版下位机，协议与固件一致） |
 | `models/` | `ppe_best.pt`（人员装备）、`chem_best.pt`（器皿）、`*_rknn_model/`（导出好的 NPU 模型，FP16，入库）。只有在 Rockchip 板子上才用 RKNN；NPU 加载失败时自动改用 .pt 并记一条事件 |
 | `runtime/` | 运行时生成，不入库：`events.db`、`snapshots/`、`web_token.txt`、`config_override.yaml` |
@@ -200,6 +200,7 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 | 采购清单、硬件接线 | `docs/开发记录/修改说明与落地计划.md` 第 3、4 节 |
 | 早期代码审查结论 | `docs/开发记录/代码审查与改进方案.md` |
 | 评委视角的问题清单和瘦身计划（待执行） | `docs/开发记录/评委视角审查与瘦身计划.md` |
+| AIC 比赛信息、双设备演示方案、优化清单 | `docs/开发记录/AIC备赛：双设备方案与优化清单.md` |
 | 旧版本代码 | git 标签 `v1-prototype`（最初原型）、`v2-before-restructure`（整理目录前） |
 
 ## 11. 代码约定
@@ -216,7 +217,7 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 - 呼叫教师：小屏「呼叫教师」→ `engine.last_call` 随快照上报 → 总后台处置队列置顶「求助」，老师点「已知晓」（`POST /api/desks/{id}/call_ack`，只在总后台记录）后消失，10 分钟未处理也自动消失。
 - 没接控制盒时终端用模拟温湿度维持界面（`telemetry.source = simulated`），总后台实验桌页和小屏不显示这些数值，标「控制盒未接入」。
 - 已完成并测试通过：安全核心、规则 R1–R9、温度预测、事件中心、开发板本机控制台、实验台小屏、安全助手（三条线路）、外部温湿度控制（上位机 + 固件 + 协议）、演示数据、交叉验证（三级风险 + 处置动作）、台面安全区。
-- 分层上报（2026-10-23）：`cross_check.tiers()`、总后台分层视角、演示脚本的「摘防护吃东西」场景（LG-E01）已完成；新增用例只在无界面库的环境里单独跑过判级与兜底逻辑，完整三套测试需在装好依赖的电脑上重跑确认。
+- 分层上报（2026-10-23）：`cross_check.tiers()`、总后台分层视角、演示脚本的「摘防护吃东西」场景（LG-E01）已完成；完整三套测试已于 2026-11-12 在 Python 3.13 + PySide6 环境重跑，全部通过（未装 ultralytics，视觉以离线状态参与）。
 - 总后台（2026-10-23）：后端 + 网页前端完成，浏览器实测通过（`tools/center_demo.py` 演示数据）；开发板程序（`center_link.py`）与总后台已在本机联调通过（上报、阈值下发与硬上限拦截、远程断电 / 静音、画面与问答代理、断线重连、离线判定，另有自动测试），尚未在真实开发板上跑。模型看板的训练集图片数需管理员在页面上填写（数据集不在仓库里）；语音合成需在总后台机器上 `pip install edge-tts` 且联网。
 - 开发板：视美泰 AIOT-3588A（4GB，系统在 16GB TF 卡，Ubuntu 22.04）已调通小屏、USB 摄像头、开机自启（edge 模式）。RKNN 模型已导出（rknn-toolkit2 2.3.2，FP16），真机 NPU 实测（`tools/check_npu.py`）ppe_best 120 ms/帧、chem_best 116 ms/帧，结果与 .pt 一致。
 - ESP32 固件：已在 ESP32-S3-N8R8 真机烧录，串口协议、断电 ACK 往返（中位 4.9 ms）实测正常；蜂鸣器为非阻塞。传感器、继电器、控制键接上后的整机联调未完成。V-JEPA 2 功能已按计划移除。

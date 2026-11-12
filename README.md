@@ -128,13 +128,17 @@ python tools/center_init.py --center-url http://总后台的IP:8200 --password �
 python tools/center_demo.py                         # http://127.0.0.1:8210，账号 demo / Demo2026show
 python tools/center_demo.py --images 图片目录        # 批量设置各实验桌的演示画面
 python tools/center_demo.py --live LG-A01           # 1 号桌留给真实终端，其余模拟
+python tools/center_demo.py --live LG-A01,LG-A02 --host 0.0.0.0 --center-url http://192.168.8.10:8210
+                                                    # 两块开发板经局域网接入（双设备演示）
 ```
 
-演示脚本自带一栋三层楼的示意布局和 13 台模拟终端（其中 1 台模拟离线）。加 `--live` 时会生成 `runtime/center_demo_live.yaml`，用它启动终端程序即可让 A 实验室 1 号桌显示真实摄像头画面：
+演示脚本自带一栋三层楼的示意布局和 13 台模拟终端（其中 1 台模拟离线）。加 `--live` 时每台真实终端生成一份 `runtime/center_demo_live_<终端名>.yaml`（节点密钥存在 `runtime/center_demo_live_tokens.json`，重启演示总后台时沿用），用它启动终端程序即可让对应实验桌显示真实摄像头画面：
 
 ```bash
-LAB_SAFETY_CONFIG=runtime/center_demo_live.yaml python run_app.py --mode headless
+LAB_SAFETY_CONFIG=runtime/center_demo_live_LG-A01.yaml python run_app.py --mode headless
 ```
+
+开发板不在总后台电脑上时，把这份文件拷到开发板的 `labguard/runtime/` 下再启动。
 
 ### 安全助手接入大模型
 
