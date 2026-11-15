@@ -201,6 +201,7 @@ python hub/jepa_worker.py --selftest       # V-JEPA 2 流程自检（需 require
 | 早期代码审查结论 | `docs/开发记录/代码审查与改进方案.md` |
 | 评委视角的问题清单和瘦身计划（待执行） | `docs/开发记录/评委视角审查与瘦身计划.md` |
 | AIC 比赛信息、双设备演示方案、优化清单 | `docs/开发记录/AIC备赛：双设备方案与优化清单.md` |
+| AIC 预选赛（11/18 截止）规则、录制自查、6 分钟分配 | `docs/开发记录/AIC预选赛提交计划.md` |
 | 旧版本代码 | git 标签 `v1-prototype`（最初原型）、`v2-before-restructure`（整理目录前） |
 
 ## 11. 代码约定
