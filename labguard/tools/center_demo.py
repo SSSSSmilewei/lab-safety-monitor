@@ -7,10 +7,14 @@
   python tools/center_demo.py --images 演示图片目录      # 把目录里的图片设为各实验桌的演示画面
   python tools/center_demo.py --reset                  # 删掉旧的演示数据库，重新生成
   python tools/center_demo.py --live LG-A01            # 这台终端不模拟，留给真实开发板程序接入（实时画面、问答）
+  python tools/center_demo.py --live LG-A01,LG-A02 --host 0.0.0.0 --center-url http://192.168.8.10:8210
+                                                       # 两块开发板经局域网接入（双设备演示）
 
-真实终端接入（--live）：节点密钥写入 runtime/center_demo_live.yaml，开发板程序用它启动即可
-  LAB_SAFETY_CONFIG=runtime/center_demo_live.yaml python run_app.py --mode headless
-该文件是完整配置（config.yaml + center 段），串口、摄像头沿用 config.yaml。A 实验室 1 号桌对应 LG-A01。
+真实终端接入（--live）：每台终端一份配置 runtime/center_demo_live_<终端名>.yaml，开发板程序用它启动即可
+  LAB_SAFETY_CONFIG=runtime/center_demo_live_LG-A01.yaml python run_app.py --mode headless
+该文件是完整配置（config.yaml + center 段），串口、摄像头沿用 config.yaml。A 实验室 1 号桌对应 LG-A01，2 号桌对应 LG-A02。
+开发板不在本机时：--host 0.0.0.0 让局域网能访问，--center-url 填开发板访问本机用的地址，再把生成的文件拷到开发板上。
+节点密钥存在 runtime/center_demo_live_tokens.json，下次启动沿用，开发板不用每次重新拷配置。
 
 演示画面：文件名含 desk / 台面 的图片作为「台面」画面，其余作为「全景」画面，按顺序轮流分给各实验桌；
 也可以登录后在实验桌页面的画面上直接上传。终端拿不到实时画面时显示演示画面，并标明「演示画面」。
@@ -168,18 +172,29 @@ def load_images(st, folder: str) -> int:
     return count
 
 
-def write_live_config(name: str, token: str, port: int):
-    """给真实开发板程序写一份配置：config.yaml 全部内容 + 指向本演示总后台的 center 段（runtime/config_override.yaml 照常叠加）"""
+def write_live_config(name: str, token: str, center_url: str) -> str:
+    """给真实开发板程序写一份配置：config.yaml 全部内容 + 指向本演示总后台的 center 段（runtime/config_override.yaml 照常叠加）。
+    每台终端一个文件，多块开发板同时接入时互不覆盖"""
     import yaml
     with open(os.path.join(ROOT, "config.yaml"), encoding="utf-8") as f:
         conf = yaml.safe_load(f) or {}
-    conf["center"] = {**conf.get("center", {}), "url": f"http://127.0.0.1:{port}", "node_token": token}
-    path = os.path.join(ROOT, "runtime", "center_demo_live.yaml")
+    conf["center"] = {**conf.get("center", {}), "url": center_url, "node_token": token}
+    path = os.path.join(ROOT, "runtime", f"center_demo_live_{name}.yaml")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        f.write(f"# center_demo.py --live {name} 自动生成；每次启动演示都会换新密钥\n")
+        f.write(f"# center_demo.py --live {name} 自动生成；总后台地址 {center_url}\n")
         yaml.safe_dump(conf, f, allow_unicode=True, sort_keys=False)
     print(f"[演示] {name} 留给真实终端：LAB_SAFETY_CONFIG={os.path.relpath(path, ROOT)} python run_app.py")
+    return path
+
+
+def live_token(st, node: dict, saved: dict) -> str:
+    """沿用上次保存的节点密钥（数据库里只存哈希，所以明文另存在 runtime/ 下）；对不上就换一把新的"""
+    tok = saved.get(node["name"], "")
+    hit = st.node_by_token(tok) if tok else None
+    if hit is not None and hit["id"] == node["id"]:
+        return tok
+    return st.rotate_node_token(node["id"])
 
 
 def main():
@@ -189,7 +204,10 @@ def main():
     ap.add_argument("--images", default="", help="演示画面图片目录")
     ap.add_argument("--reset", action="store_true", help="删除旧的演示数据库后重新生成")
     ap.add_argument("--live", default="", help="留给真实开发板接入的终端名，如 LG-A01（多个用逗号分隔）")
+    ap.add_argument("--host", default="127.0.0.1", help="监听地址；开发板在局域网里接入时用 0.0.0.0")
+    ap.add_argument("--center-url", default="", help="开发板访问本总后台用的地址，如 http://192.168.8.10:8210；默认本机地址")
     args = ap.parse_args()
+    center_url = (args.center_url or f"http://127.0.0.1:{args.port}").rstrip("/")
 
     import uvicorn
     from fastapi.testclient import TestClient
@@ -210,12 +228,28 @@ def main():
     live = [x.strip() for x in args.live.split(",") if x.strip()]
     tokens = [(st.rotate_node_token(n["id"]),) + PLAN[n["name"]] for n in st.nodes()
               if n["name"] in PLAN and n["name"] not in live]
+    import json
+    tok_path = os.path.join(ROOT, "runtime", "center_demo_live_tokens.json")
+    try:
+        with open(tok_path, encoding="utf-8") as f:
+            saved = json.load(f)
+    except (OSError, ValueError):
+        saved = {}
     for name in live:
         node = next((n for n in st.nodes() if n["name"] == name), None)
         if node is None:
             print(f"[演示] 没有名为 {name} 的终端，可选：{', '.join(sorted(PLAN))}")
             return
-        write_live_config(name, st.rotate_node_token(node["id"]), args.port)
+        saved[name] = live_token(st, node, saved)
+        write_live_config(name, saved[name], center_url)
+    if live:
+        os.makedirs(os.path.dirname(tok_path), exist_ok=True)
+        with open(tok_path, "w", encoding="utf-8") as f:
+            json.dump(saved, f, ensure_ascii=False, indent=1)
+        try:
+            os.chmod(tok_path, 0o600)
+        except OSError:
+            pass
 
     def report_loop():
         c = TestClient(app)
@@ -232,7 +266,7 @@ def main():
     print(f"[演示] 数据库 {args.db}")
     print(f"[演示] 打开 http://127.0.0.1:{args.port}  ·  demo / Demo2026show  ·  admin / Demo2026admin  ·  "
           f"zhang_t / Demo2026teach  ·  li_t / Demo2026teach  ·  pixel / Demo2026pixel")
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":
